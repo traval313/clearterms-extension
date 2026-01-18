@@ -1,65 +1,147 @@
 "use strict"
 
-const blurFilter = "blur(6px)"
-let textToBlur = ""
+const URL_KEYWORDS = [
+    "terms",
+    "privacy",
+    "policy",
+    "conditions",
+    "agreement",
+    "legal",
+    "eula",
+]
 
-// Search this DOM node for text to blur and blur the parent element if found.
-function processNode(node) {
-    if (node.childNodes.length > 0) {
-        Array.from(node.childNodes).forEach(processNode)
+const PAGE_KEYWORDS = [
+    "terms of service",
+    "terms & conditions",
+    "terms and conditions",
+    "privacy policy",
+    "data policy",
+    "acceptable use",
+    "user agreement",
+    "service agreement",
+    "cookie policy",
+    "legal notice",
+]
+
+const ACTION_KEYWORDS = [
+    "accept",
+    "agree",
+    "consent",
+    "decline",
+    "continue",
+]
+
+let lastDetection = null
+let pendingEvaluation = false
+
+evaluateDetection(true)
+setupDomObserver()
+
+function setupDomObserver() {
+    if (!document) {
+        return
     }
-    if (node.nodeType === Node.TEXT_NODE &&
-        node.textContent !== null && node.textContent.trim().length > 0) {
-        const parent = node.parentElement
-        if (parent !== null &&
-            (parent.tagName === 'SCRIPT' || parent.style.filter === blurFilter)) {
-            // Already blurred
+    const observer = new MutationObserver(() => scheduleEvaluation())
+    observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+    })
+}
+
+function scheduleEvaluation() {
+    if (pendingEvaluation) {
+        return
+    }
+    pendingEvaluation = true
+    setTimeout(() => {
+        pendingEvaluation = false
+        evaluateDetection(false)
+    }, 800)
+}
+
+function evaluateDetection(forceSend) {
+    const detection = collectDetection()
+    if (!forceSend && !hasDetectionChanged(detection)) {
+        return
+    }
+    lastDetection = detection
+    chrome.runtime.sendMessage({
+        type: "LEGAL_PAGE_DETECTION",
+        payload: detection,
+    }, () => chrome.runtime.lastError && console.debug(chrome.runtime.lastError))
+}
+
+function collectDetection() {
+    const matchedUrlKeywords = findUrlKeywords()
+    const matchedContentKeywords = findContentKeywords()
+    const matchedActionKeywords = findActionKeywords()
+
+    let score = 0
+    if (matchedUrlKeywords.length > 0) score += 1
+    if (matchedContentKeywords.length > 0) score += 1
+    if (matchedActionKeywords.length > 0) score += 1
+
+    const detected = score >= 2 || matchedContentKeywords.length >= 2
+
+    return {
+        detected,
+        score,
+        matchedUrlKeywords,
+        matchedContentKeywords,
+        matchedActionKeywords,
+    }
+}
+
+function hasDetectionChanged(nextDetection) {
+    if (lastDetection === null) {
+        return true
+    }
+    return lastDetection.detected !== nextDetection.detected ||
+        lastDetection.score !== nextDetection.score ||
+        arrayChanged(lastDetection.matchedUrlKeywords, nextDetection.matchedUrlKeywords) ||
+        arrayChanged(lastDetection.matchedContentKeywords, nextDetection.matchedContentKeywords) ||
+        arrayChanged(lastDetection.matchedActionKeywords, nextDetection.matchedActionKeywords)
+}
+
+function arrayChanged(prev, next) {
+    if (prev.length !== next.length) {
+        return true
+    }
+    for (let i = 0; i < prev.length; i += 1) {
+        if (prev[i] !== next[i]) {
+            return true
+        }
+    }
+    return false
+}
+
+function findUrlKeywords() {
+    const href = window.location.href.toLowerCase()
+    return URL_KEYWORDS.filter((keyword) => href.includes(keyword))
+}
+
+function findContentKeywords() {
+    const body = document.body
+    if (!body) {
+        return []
+    }
+    const text = body.innerText.toLowerCase().slice(0, 50000)
+    return PAGE_KEYWORDS.filter((keyword) => text.includes(keyword))
+}
+
+function findActionKeywords() {
+    const matches = new Set()
+    const selector = "button, a, input[type='button'], input[type='submit']"
+    document.querySelectorAll(selector).forEach((node) => {
+        const textContent = (node.textContent || node.value || "").trim().toLowerCase()
+        if (!textContent) {
             return
         }
-        if (node.textContent.includes(textToBlur)) {
-            blurElement(parent)
-        }
-    }
-}
-
-function blurElement(elem) {
-    elem.style.filter = blurFilter
-    console.debug("blurred id:" + elem.id + " class:" + elem.className +
-        " tag:" + elem.tagName + " text:" + elem.textContent)
-}
-
-// Create a MutationObserver to watch for changes to the DOM. ← will watch the web pages opened
-const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-        if (mutation.addedNodes.length > 0) {
-            mutation.addedNodes.forEach(processNode)
-        } else {
-            processNode(mutation.target)
-        }
-    })
-})
-
-// Enable the content script by default.
-let enabled = true
-const keys = ["enabled", "item"]
-
-chrome.storage.sync.get(keys, (data) => {
-    if (data.enabled === false) {
-        enabled = false
-    }
-    if (data.item) {
-        textToBlur = data.item
-    }
-    // Only start observing the DOM if the extension is enabled and there is text to blur.
-    if (enabled && textToBlur.trim().length > 0) {
-        observer.observe(document, {
-            attributes: false,
-            characterData: true,
-            childList: true,
-            subtree: true,
+        ACTION_KEYWORDS.forEach((keyword) => {
+            if (textContent.includes(keyword)) {
+                matches.add(keyword)
+            }
         })
-        // Loop through all elements on the page for initial processing.
-        processNode(document)
-    }
-})
-
+    })
+    return Array.from(matches.values())
+}
