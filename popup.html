@@ -8,38 +8,65 @@
 <body>
 <div class="popup">
     <header class="popup__header">
-        <div>
-            <p class="eyebrow">ClearTerms Preview</p>
-            <h1>Legal page detection</h1>
+        <div class="brand">
+            <span class="brand__glyph" aria-hidden="true"></span>
+            <div>
+                <p class="eyebrow">ClearTerms</p>
+                <h1>Signal monitor</h1>
+            </div>
         </div>
         <span class="badge" id="detectionBadge">Detecting…</span>
     </header>
 
-    <section id="legalState" class="panel hidden">
-        <p class="lead">This page looks like a Terms or Privacy document. Want us to analyze it when analysis is ready?</p>
+    <p class="subtitle">We quietly watch for legal documents, then surface only what matters.</p>
+
+    <ul class="stateTrack" aria-label="Detection progress">
+        <li data-state="idle">
+            <span class="stateTrack__dot"></span>
+            <span class="stateTrack__label">Idle</span>
+        </li>
+        <li data-state="detected">
+            <span class="stateTrack__dot"></span>
+            <span class="stateTrack__label">Detected</span>
+        </li>
+        <li data-state="loading">
+            <span class="stateTrack__dot"></span>
+            <span class="stateTrack__label">Loading</span>
+        </li>
+        <li data-state="preview">
+            <span class="stateTrack__dot"></span>
+            <span class="stateTrack__label">Preview</span>
+        </li>
+    </ul>
+
+    <section id="legalState" class="panel hidden" aria-live="polite">
+        <header class="panel__title">Signals triggered</header>
+        <p class="lead">This page looks like a Terms or Privacy notice. Ready for a capture?</p>
         <div class="panel__details">
-            <p class="panel__label">What we noticed:</p>
+            <p class="panel__label">Why we paused here</p>
             <ul id="detectionReasons"></ul>
         </div>
         <div class="actions">
-            <button id="consentYes" class="btn btn--primary">Yes, analyze this page</button>
-            <button id="consentNo" class="btn">Not now</button>
+            <button id="consentYes" class="btn btn--primary">Start capture</button>
+            <button id="consentNo" class="btn">Ignore</button>
         </div>
     </section>
 
-    <section id="neutralState" class="panel hidden">
-        <p class="lead">No legal document detected on this page yet.</p>
-        <p class="muted">Visit a Terms of Service or Privacy Policy page to trigger ClearTerms.</p>
+    <section id="neutralState" class="panel hidden" aria-live="polite">
+        <header class="panel__title">Idle mode</header>
+        <p class="lead">No legal text detected yet.</p>
+        <p class="muted">Open a Terms of Service or Privacy Policy page to activate monitoring.</p>
     </section>
 
-    <section id="acceptedState" class="panel hidden">
+    <section id="acceptedState" class="panel hidden" aria-live="polite">
+        <header class="panel__title">Capture status</header>
         <p class="lead" id="extractionHeadline"></p>
         <p class="muted" id="extractionSubhead"></p>
         <div class="panel__details hidden" id="extractionDetails">
-            <p class="panel__label">Extraction details</p>
+            <p class="panel__label">Latest snapshot</p>
             <dl class="metaList">
                 <div>
-                    <dt>Page URL</dt>
+                    <dt>URL</dt>
                     <dd id="extractionUrl"></dd>
                 </div>
                 <div>
@@ -50,9 +77,10 @@
         </div>
     </section>
 
-    <section id="declinedState" class="panel hidden">
+    <section id="declinedState" class="panel hidden" aria-live="polite">
+        <header class="panel__title">Monitoring paused</header>
         <p class="lead" id="consentMessage"></p>
-        <p class="muted">We’ll remember your choice for this tab. Open the popup again to restart analysis.</p>
+        <p class="muted">We’ll remember this until you reopen the popup.</p>
     </section>
 </div>
 <script src="popup.js"></script>
