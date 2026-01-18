@@ -152,7 +152,6 @@ function createDefaultState() {
         analysisStatus: "idle",
         analysisResult: null,
         analysisError: null,
-        analysisRawResponse: null,
     }
 }
 
@@ -198,7 +197,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             analysisStatus: "idle",
             analysisResult: null,
             analysisError: null,
-            analysisRawResponse: null,
             ...(consent === "declined" ? {
                 extractionStatus: "idle",
                 extractionResult: null,
@@ -224,7 +222,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 analysisStatus: "pending",
                 analysisResult: null,
                 analysisError: null,
-                analysisRawResponse: null,
             })
             scheduleTask(() => runGeminiAnalysis(tabId))
         } else {
@@ -236,7 +233,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 analysisStatus: "idle",
                 analysisResult: null,
                 analysisError: null,
-                analysisRawResponse: null,
             })
         }
         return undefined
@@ -261,7 +257,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             analysisStatus: "pending",
             analysisResult: null,
             analysisError: null,
-            analysisRawResponse: null,
         })
         scheduleTask(() => runGeminiAnalysis(tabId))
         sendResponse?.({started: true, status: "pending"})
@@ -299,7 +294,6 @@ chrome.tabs.onRemoved.addListener((tabId) => {
  * @property {"idle"|"pending"|"success"|"error"} analysisStatus
  * @property {LegalAnalysisResult|null} analysisResult
  * @property {string|null} analysisError
- * @property {string|null} analysisRawResponse
  */
 
 /**
@@ -325,7 +319,6 @@ function startExtractionForTab(tabId) {
         analysisStatus: "idle",
         analysisResult: null,
         analysisError: null,
-        analysisRawResponse: null,
     })
     chrome.tabs.sendMessage(tabId, {type: "START_LEGAL_TEXT_EXTRACTION"}, (response) => {
         if (chrome.runtime.lastError) {
@@ -377,14 +370,12 @@ async function runGeminiAnalysis(tabId) {
             analysisStatus: "error",
             analysisResult: null,
             analysisError: "No extracted text available for analysis.",
-            analysisRawResponse: null,
         })
         return
     }
 
     const controller = new AbortController()
     analysisControllers.set(tabId, controller)
-    let rawResponse = null
 
     try {
         const apiKey = await getGeminiApiKey()
@@ -394,7 +385,6 @@ async function runGeminiAnalysis(tabId) {
 
         const prompt = buildGeminiPrompt(extraction)
         const rawText = await requestGeminiAnalysis(apiKey, prompt, controller.signal)
-        rawResponse = rawText
         const parsed = parseGeminiJson(rawText)
         const normalized = normalizeAnalysisPayload(parsed)
 
@@ -402,7 +392,6 @@ async function runGeminiAnalysis(tabId) {
             analysisStatus: "success",
             analysisResult: normalized,
             analysisError: null,
-            analysisRawResponse: rawResponse,
         })
     } catch (error) {
         if (controller.signal.aborted) {
@@ -413,7 +402,6 @@ async function runGeminiAnalysis(tabId) {
             analysisStatus: "error",
             analysisResult: null,
             analysisError: message,
-            analysisRawResponse: rawResponse,
         })
     } finally {
         if (analysisControllers.get(tabId) === controller) {

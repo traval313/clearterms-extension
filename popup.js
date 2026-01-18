@@ -4,6 +4,10 @@ let activeTabId = null
 let currentState = null
 let pollingHandle = null
 let analysisKickoffRequested = false
+let currentAnalysisView = "meter"
+let hasBreakdownData = false
+let hasSummaryData = false
+let hasMeterData = false
 
 const detectionBadge = document.getElementById("detectionBadge")
 const legalState = document.getElementById("legalState")
@@ -19,12 +23,19 @@ const extractionSubhead = document.getElementById("extractionSubhead")
 const analysisState = document.getElementById("analysisState")
 const analysisHeadline = document.getElementById("analysisHeadline")
 const analysisSubhead = document.getElementById("analysisSubhead")
-const analysisSummaryBlock = document.getElementById("analysisSummaryBlock")
+const analysisContent = document.getElementById("analysisContent")
+const analysisMeterView = document.getElementById("analysisMeterView")
+const analysisMeterInteractive = document.getElementById("analysisMeterInteractive")
+const analysisBreakdownView = document.getElementById("analysisBreakdownView")
+const analysisBreakdownGrid = document.getElementById("analysisBreakdownGrid")
+const analysisSummaryView = document.getElementById("analysisSummaryView")
 const analysisSummary = document.getElementById("analysisSummary")
-const analysisScores = document.getElementById("analysisScores")
-const analysisConfidence = document.getElementById("analysisConfidence")
-const analysisRawBlock = document.getElementById("analysisRawBlock")
-const analysisRaw = document.getElementById("analysisRaw")
+const analysisSummaryButton = document.getElementById("analysisSummaryButton")
+const analysisBackButton = document.getElementById("analysisBackButton")
+const riskMeterNeedle = document.getElementById("riskMeterNeedle")
+const riskMeterScore = document.getElementById("riskMeterScore")
+const riskMeterLabel = document.getElementById("riskMeterLabel")
+const riskMeterHint = document.getElementById("riskMeterHint")
 
 const SCORE_LABELS = {
     overall: "Overall risk",
@@ -45,6 +56,26 @@ const SCORE_BANDS = [
 
 consentYes.addEventListener("click", () => submitConsent("accepted"))
 consentNo.addEventListener("click", () => submitConsent("declined"))
+
+if (analysisMeterInteractive) {
+    analysisMeterInteractive.addEventListener("click", handleMeterActivate)
+    analysisMeterInteractive.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
+            event.preventDefault()
+            handleMeterActivate()
+        }
+    })
+}
+
+analysisSummaryButton?.addEventListener("click", () => {
+    if (!hasSummaryData) {
+        return
+    }
+    setAnalysisView("summary")
+    scrollAnalysisViewIntoFocus(analysisSummaryView)
+})
+
+analysisBackButton?.addEventListener("click", () => setAnalysisView("meter"))
 
 document.addEventListener("DOMContentLoaded", () => {
     chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
@@ -109,7 +140,6 @@ function renderState(state) {
         analysisStatus: "idle",
         analysisResult: null,
         analysisError: null,
-        analysisRawResponse: null,
     }
     setBadge(currentState)
     updatePanels(currentState)
@@ -209,7 +239,7 @@ function updateExtractionPanel(state) {
 }
 
 function updateAnalysisPanel(state) {
-    if (!analysisState || !analysisHeadline || !analysisSubhead || !analysisSummaryBlock || !analysisSummary || !analysisScores || !analysisConfidence || !analysisRawBlock || !analysisRaw) {
+    if (!analysisState || !analysisHeadline || !analysisSubhead || !analysisContent || !analysisSummary) {
         return
     }
     const hasConsent = state.consent === "accepted"
@@ -223,15 +253,25 @@ function updateAnalysisPanel(state) {
     const result = state.analysisResult || null
     let headline = "Waiting for analysis"
     let subhead = "We’ll run Gemini as soon as the capture finishes."
-    let showSummary = false
-    let showScores = false
-    let showConfidence = false
-    let showRaw = false
 
     analysisSummary.textContent = ""
-    analysisScores.innerHTML = ""
-    analysisConfidence.textContent = ""
-    analysisRaw.textContent = ""
+    if (analysisBreakdownGrid) {
+        analysisBreakdownGrid.innerHTML = ""
+    }
+
+    hasBreakdownData = false
+    hasSummaryData = false
+    hasMeterData = false
+    analysisContent.classList.add("hidden")
+    analysisMeterView?.classList.add("is-disabled")
+    analysisMeterInteractive?.setAttribute("aria-disabled", "true")
+    analysisMeterInteractive?.setAttribute("tabindex", "-1")
+    riskMeterHint?.classList.add("is-muted")
+    riskMeterScore && (riskMeterScore.textContent = "--")
+    riskMeterLabel && (riskMeterLabel.textContent = "Awaiting")
+    riskMeterNeedle?.style.setProperty("--needle-rotation", "-90deg")
+    analysisSummaryButton && (analysisSummaryButton.disabled = true)
+    setAnalysisView("meter")
 
     analysisState.classList.toggle("panel--error", status === "error")
 
@@ -244,22 +284,28 @@ function updateAnalysisPanel(state) {
         if (result) {
             headline = "Key takeaways"
             subhead = "Summarized strictly from the captured document."
-            analysisSummary.textContent = result.summary
-            showSummary = true
-            showScores = renderScoreCards(result.scores)
-        }
-        if (state.analysisRawResponse) {
-            analysisRaw.textContent = state.analysisRawResponse
-            showRaw = true
+            hasSummaryData = Boolean(result.summary && result.summary.trim().length)
+            if (hasSummaryData) {
+                analysisSummary.textContent = result.summary.trim()
+            }
+            hasMeterData = updateRiskMeter(result.scores)
+            hasBreakdownData = renderBreakdownGrid(result.scores)
+            analysisSummaryButton && (analysisSummaryButton.disabled = !hasSummaryData)
+            analysisMeterView?.classList.toggle("is-disabled", !hasBreakdownData)
+            if (analysisMeterInteractive) {
+                analysisMeterInteractive.setAttribute("aria-disabled", String(!hasBreakdownData))
+                analysisMeterInteractive.setAttribute("tabindex", hasBreakdownData ? "0" : "-1")
+            }
+            riskMeterHint?.classList.toggle("is-muted", !hasBreakdownData)
+            if (hasMeterData || hasBreakdownData || hasSummaryData) {
+                analysisContent.classList.remove("hidden")
+                setAnalysisView(currentAnalysisView)
+            }
         }
         break
     case "error":
         headline = "Analysis unavailable"
         subhead = state.analysisError || "Gemini could not analyze this document."
-        if (state.analysisRawResponse) {
-            analysisRaw.textContent = state.analysisRawResponse
-            showRaw = true
-        }
         break
     default:
         if (state.extractionStatus === "pending") {
@@ -273,40 +319,62 @@ function updateAnalysisPanel(state) {
 
     analysisHeadline.textContent = headline
     analysisSubhead.textContent = subhead
-    analysisSummaryBlock.classList.toggle("hidden", !showSummary)
-    analysisScores.classList.toggle("hidden", !showScores)
-    analysisConfidence.classList.toggle("hidden", !showConfidence)
-    analysisRawBlock.classList.toggle("hidden", !showRaw)
 }
 
-function renderScoreCards(scoreData) {
-    if (!scoreData || typeof scoreData !== "object" || !analysisScores) {
+function setAnalysisView(view) {
+    if (!analysisContent) {
+        return
+    }
+    // Keep navigation consistent even if certain datasets are missing.
+    let targetView = view
+    if (targetView === "breakdown" && !hasBreakdownData) {
+        targetView = hasMeterData ? "meter" : (hasSummaryData ? "summary" : "meter")
+    }
+    if (targetView === "summary" && !hasSummaryData) {
+        targetView = hasMeterData ? "meter" : (hasBreakdownData ? "breakdown" : "meter")
+    }
+    if (targetView === "meter" && !hasMeterData) {
+        targetView = hasBreakdownData ? "breakdown" : (hasSummaryData ? "summary" : "meter")
+    }
+    currentAnalysisView = targetView
+    analysisMeterView?.classList.toggle("hidden", currentAnalysisView !== "meter")
+    analysisBreakdownView?.classList.toggle("hidden", currentAnalysisView !== "breakdown")
+    analysisSummaryView?.classList.toggle("hidden", currentAnalysisView !== "summary")
+    analysisBackButton?.classList.toggle("hidden", currentAnalysisView === "meter")
+}
+
+function handleMeterActivate() {
+    if (!hasBreakdownData) {
+        return
+    }
+    setAnalysisView("breakdown")
+    scrollAnalysisViewIntoFocus(analysisBreakdownView)
+}
+
+function updateRiskMeter(scoreData) {
+    if (!riskMeterScore || !riskMeterLabel || !riskMeterNeedle) {
         return false
     }
-    const breakdown = scoreData.breakdown && typeof scoreData.breakdown === "object" ? scoreData.breakdown : {}
-    let rendered = false
-
-    if (Number.isFinite(scoreData.overall)) {
-        rendered = true
-        const overallCard = document.createElement("div")
-        overallCard.className = "scoreCard scoreCard--overall"
-
-        const label = document.createElement("p")
-        label.className = "scoreCard__label"
-        label.textContent = SCORE_LABELS.overall
-
-        const value = document.createElement("p")
-        value.className = "scoreCard__value"
-        value.textContent = String(Math.round(scoreData.overall))
-
-        const band = document.createElement("p")
-        band.className = "scoreCard__tag"
-        band.textContent = scoreData.finalLevel || describeScoreBand(scoreData.overall)
-
-        overallCard.append(label, value, band)
-        analysisScores.appendChild(overallCard)
+    const rawValue = Number(scoreData?.overall)
+    if (!Number.isFinite(rawValue)) {
+        return false
     }
+    const value = Math.max(0, Math.min(100, rawValue))
+    riskMeterScore.textContent = String(Math.round(value))
+    const label = scoreData?.finalLevel || describeScoreBand(value)
+    riskMeterLabel.textContent = label || ""
+    const rotation = -90 + (value / 100) * 180
+    riskMeterNeedle.style.setProperty("--needle-rotation", `${rotation}deg`)
+    return true
+}
 
+function renderBreakdownGrid(scoreData) {
+    if (!analysisBreakdownGrid) {
+        return false
+    }
+    analysisBreakdownGrid.innerHTML = ""
+    const breakdown = scoreData?.breakdown && typeof scoreData.breakdown === "object" ? scoreData.breakdown : {}
+    let rendered = false
     const order = ["data_collection", "data_sharing", "user_control", "data_longevity", "legal_integrity"]
     order.forEach((key) => {
         const raw = Number(breakdown[key])
@@ -314,25 +382,42 @@ function renderScoreCards(scoreData) {
             return
         }
         rendered = true
-        const card = document.createElement("div")
-        card.className = "scoreCard"
+        const value = Math.max(0, Math.min(100, raw))
+        const cube = document.createElement("div")
+        cube.className = `scoreCube ${scoreLevelClass(value)}`
 
         const label = document.createElement("p")
-        label.className = "scoreCard__label"
+        label.className = "scoreCube__label"
         label.textContent = SCORE_LABELS[key] || key
 
-        const value = document.createElement("p")
-        value.className = "scoreCard__value"
-        value.textContent = String(Math.round(raw))
+        const score = document.createElement("p")
+        score.className = "scoreCube__value"
+        score.textContent = String(Math.round(value))
 
         const band = document.createElement("p")
-        band.className = "scoreCard__tag"
-        band.textContent = describeScoreBand(raw)
+        band.className = "scoreCube__tag"
+        band.textContent = describeScoreBand(value)
 
-        card.append(label, value, band)
-        analysisScores.appendChild(card)
+        cube.append(label, score, band)
+        analysisBreakdownGrid.appendChild(cube)
     })
     return rendered
+}
+
+function scoreLevelClass(score) {
+    if (score >= 80) {
+        return "scoreLevel--positive"
+    }
+    if (score >= 60) {
+        return "scoreLevel--steady"
+    }
+    if (score >= 40) {
+        return "scoreLevel--caution"
+    }
+    if (score >= 20) {
+        return "scoreLevel--high"
+    }
+    return "scoreLevel--critical"
 }
 
 function describeScoreBand(score) {
@@ -342,6 +427,13 @@ function describeScoreBand(score) {
         }
     }
     return ""
+}
+
+function scrollAnalysisViewIntoFocus(element) {
+    if (!element || element.classList.contains("hidden")) {
+        return
+    }
+    element.scrollIntoView({behavior: "smooth", block: "start"})
 }
 
 function maybeRequestAnalysis(state) {
