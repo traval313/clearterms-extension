@@ -68,15 +68,46 @@
         <header class="panel__title">AI insights</header>
         <p class="lead" id="analysisHeadline"></p>
         <p class="muted" id="analysisSubhead"></p>
-        <div class="panel__details hidden" id="analysisSummaryBlock">
-            <p class="panel__label">Summary</p>
-            <p class="analysisSummary" id="analysisSummary"></p>
-        </div>
-        <div class="scoreGrid hidden" id="analysisScores" aria-label="Risk scores"></div>
-        <p class="muted hidden" id="analysisConfidence"></p>
-        <div class="panel__details hidden" id="analysisRawBlock">
-            <p class="panel__label">Gemini raw output</p>
-            <pre class="rawResponse" id="analysisRaw"></pre>
+        <div class="analysisViews hidden" id="analysisContent">
+            <button id="analysisBackButton" class="chipButton hidden" type="button">Back</button>
+            <div class="analysisView" id="analysisMeterView" aria-live="polite">
+                <div id="analysisMeterInteractive" class="riskMeter" role="button" tabindex="0" aria-label="View category breakdown">
+                    <div class="riskMeter__dial">
+                        <svg viewBox="0 0 200 110" class="riskMeter__svg" aria-hidden="true" focusable="false">
+                            <defs>
+                                <linearGradient id="riskMeterGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stop-color="#ff5d8f" />
+                                    <stop offset="45%" stop-color="#ffc15a" />
+                                    <stop offset="100%" stop-color="#3af9b2" />
+                                </linearGradient>
+                            </defs>
+                            <path d="M15 100 A85 85 0 0 1 185 100" class="riskMeter__track" />
+                            <path d="M25 100 A75 75 0 0 1 175 100" class="riskMeter__arc" />
+                        </svg>
+                        <div class="riskMeter__needle" id="riskMeterNeedle">
+                            <span class="riskMeter__needleBody"></span>
+                            <span class="riskMeter__needleCap"></span>
+                        </div>
+                    </div>
+                    <div class="riskMeter__value">
+                        <span class="riskMeter__score" id="riskMeterScore">--</span>
+                        <span class="riskMeter__label" id="riskMeterLabel">Awaiting</span>
+                    </div>
+                </div>
+                <div class="riskMeter__footer">
+                    <p class="riskMeter__hint" id="riskMeterHint">Tap the dial to explore category scores.</p>
+                    <button id="analysisSummaryButton" class="linkButton" type="button">Summary</button>
+                </div>
+            </div>
+            <div class="analysisView hidden" id="analysisBreakdownView" aria-live="polite">
+                <p class="panel__label">Category breakdown</p>
+                <div class="categoryGrid" id="analysisBreakdownGrid" aria-label="Category scores"></div>
+            </div>
+            <div class="analysisView hidden" id="analysisSummaryView" aria-live="polite">
+                <p class="panel__label">Summary</p>
+                <div class="analysisSummary" id="analysisSummary"></div>
+                <p class="summaryDisclaimer">Information only. Not legal advice.</p>
+            </div>
         </div>
     </section>
 
