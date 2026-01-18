@@ -1,21 +1,28 @@
 {
   "manifest_version": 3,
-  "name": "ClearTerms Chrome Extension",
-  "version": "0.1.0",
-  "description": "My first Chrome extension.",
+  "name": "ClearTerms",
+  "version": "0.2.0",
+  "description": "Detects legal pages and prepares ClearTerms consent flow.",
   "action": {
+    "default_title": "ClearTerms",
     "default_popup": "popup.html"
   },
   "permissions": [
-    "storage"
+    "storage",
+    "tabs",
+    "activeTab"
   ],
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"]
-    }
+  "host_permissions": [
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js"
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
 }

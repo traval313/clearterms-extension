@@ -1,15 +1,42 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>My popup</title>
+    <meta charset="UTF-8">
+    <title>ClearTerms</title>
     <link rel="stylesheet" type="text/css" href="popup.css">
 </head>
 <body>
-<label class="switch">
-    <input id="enabled" type="checkbox">
-    <span class="slider round"></span>
-</label>
-<input class="secret" id="item" type="text">
+<div class="popup">
+    <header class="popup__header">
+        <div>
+            <p class="eyebrow">ClearTerms Preview</p>
+            <h1>Legal page detection</h1>
+        </div>
+        <span class="badge" id="detectionBadge">Detecting…</span>
+    </header>
+
+    <section id="legalState" class="panel hidden">
+        <p class="lead">This page looks like a Terms or Privacy document. Want us to analyze it when analysis is ready?</p>
+        <div class="panel__details">
+            <p class="panel__label">What we noticed:</p>
+            <ul id="detectionReasons"></ul>
+        </div>
+        <div class="actions">
+            <button id="consentYes" class="btn btn--primary">Yes, analyze this page</button>
+            <button id="consentNo" class="btn">Not now</button>
+        </div>
+    </section>
+
+    <section id="neutralState" class="panel hidden">
+        <p class="lead">No legal document detected on this page yet.</p>
+        <p class="muted">Visit a Terms of Service or Privacy Policy page to trigger ClearTerms.</p>
+    </section>
+
+    <section id="consentState" class="panel hidden">
+        <p class="lead" id="consentMessage"></p>
+        <p class="muted">We’ll remember your choice for this tab. Analysis features arrive in upcoming releases.</p>
+    </section>
+</div>
 <script src="popup.js"></script>
 </body>
 </html>
-

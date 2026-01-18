@@ -1,39 +1,24 @@
 # ClearTerms Chrome Extension (MVP)
 
-This repository contains the MVP for ClearTerms, a Chrome extension designed to help users better understand Terms of Service and Privacy Policy pages through AI-powered analysis and summaries.
+ClearTerms helps surface Terms of Service and Privacy Policy pages the moment you land on them. In this PR-focused MVP, the extension:
+
+- Scans the active tab with heuristics (URL, text keywords, action buttons) to determine if the page looks like a legal document.
+- Passes the detection state from `content.js` → `background.js` → the popup, tracking state per tab.
+- Prompts the user for explicit consent before any future analysis work begins.
+
+This version does **not** run AI analysis yet—it only lays the detection + consent foundation described in the PRD.
 
 ## Run the Extension Locally (Chrome)
 
-Follow the steps below to load the extension in your own browser.
+1. Clone or download this repository.
+2. Open `chrome://extensions/` in Chrome and enable **Developer mode**.
+3. Click **Load unpacked** and select this project folder (the one containing `manifest.json`).
+4. Open the popup on any site and navigate to a Terms/Privacy page. The popup will show the detection state and consent actions.
 
-### 1. Clone the Repository
-Open your terminal and navigate to the directory where you want the project stored (e.g., `Documents/`), then run:
+## Development Notes
 
-```bash
-git clone https://github.com/traval313/clearterms-extension.git
-```
+- `content.js` performs lightweight DOM scans and sends detection messages to the background script.
+- `background.js` stores detection + consent per tab so the popup always reflects the latest state.
+- `popup.js` requests the detection state for the active tab and renders either the consent UI or the fallback “no legal document detected” view.
 
-### 2. Open Chrome Extensions Page
-In Google Chrome, navigate to:
-
-```
-chrome://extensions/
-```
-
-### 3. Enable Developer Mode
-Toggle Developer mode on (top right corner).
-
-### 4. Load the Extension
-- Click **Load unpacked** (top left).
-- Select the `clearterms-extension` folder you just cloned (the folder containing `manifest.json`, `popup.html`, etc.).
-
-### 5. Confirm Installation
-You should now see the extension listed as:
-
-```
-ClearTerms Chrome Extension
-```
-
-under All Extensions 🎉
-
-The extension is now loaded and ready for development or testing.
+Future PRs (per the PRD) will plug analysis, AI prompts, and richer UI states into this baseline.

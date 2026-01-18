@@ -1,33 +1,115 @@
-"use strict";
+"use strict"
 
-console.log("Hello, world from popup!")
+let activeTabId = null
+let currentState = null
 
-function setBadgeText(enabled) {
-    const text = enabled ? "ON" : "OFF"
-    void chrome.action.setBadgeText({text: text})
+const detectionBadge = document.getElementById("detectionBadge")
+const legalState = document.getElementById("legalState")
+const neutralState = document.getElementById("neutralState")
+const consentState = document.getElementById("consentState")
+const detectionReasons = document.getElementById("detectionReasons")
+const consentMessage = document.getElementById("consentMessage")
+const consentYes = document.getElementById("consentYes")
+const consentNo = document.getElementById("consentNo")
+
+consentYes.addEventListener("click", () => submitConsent("accepted"))
+consentNo.addEventListener("click", () => submitConsent("declined"))
+
+document.addEventListener("DOMContentLoaded", () => {
+    chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+        if (!tabs || tabs.length === 0) {
+            renderState(null)
+            return
+        }
+        activeTabId = tabs[0].id ?? null
+        fetchDetectionState()
+    })
+})
+
+function fetchDetectionState() {
+    if (typeof activeTabId !== "number") {
+        renderState(null)
+        return
+    }
+    chrome.runtime.sendMessage({
+        type: "GET_DETECTION_STATE",
+        tabId: activeTabId,
+    }, (response) => {
+        if (chrome.runtime.lastError) {
+            console.warn("Unable to fetch detection state", chrome.runtime.lastError)
+            renderState(null)
+            return
+        }
+        renderState(response)
+    })
 }
 
-// Handle the ON/OFF switch
-const checkbox = document.getElementById("enabled")
-chrome.storage.sync.get("enabled", (data) => {
-    checkbox.checked = !!data.enabled
-    void setBadgeText(data.enabled)
-})
-
-checkbox.addEventListener("change", (event) => {
-    if (event.target instanceof HTMLInputElement) {
-        void chrome.storage.sync.set({"enabled": event.target.checked})
-        void setBadgeText(event.target.checked)
+function submitConsent(choice) {
+    if (typeof activeTabId !== "number") {
+        return
     }
-})
+    chrome.runtime.sendMessage({
+        type: "USER_CONSENT_RESPONSE",
+        tabId: activeTabId,
+        response: choice,
+    }, () => chrome.runtime.lastError && console.debug(chrome.runtime.lastError))
 
-// Handle the input field
-const input = document.getElementById("item")
-chrome.storage.sync.get("item", (data) => {
-    input.value = data.item || ""
-});
-input.addEventListener("change", (event) => {
-    if (event.target instanceof HTMLInputElement) {
-        void chrome.storage.sync.set({"item": event.target.value})
+    const nextState = {...currentState, consent: choice}
+    renderState(nextState)
+}
+
+function renderState(state) {
+    currentState = state ?? {
+        detected: false,
+        matchedUrlKeywords: [],
+        matchedContentKeywords: [],
+        matchedActionKeywords: [],
+        consent: null,
     }
-})
+    setBadge(currentState)
+    updatePanels(currentState)
+    updateReasons(currentState)
+}
+
+function setBadge(state) {
+    detectionBadge.textContent = state.detected ? "Legal page" : "Idle"
+    detectionBadge.classList.toggle("badge--highlight", state.detected)
+    detectionBadge.classList.toggle("badge--neutral", !state.detected)
+}
+
+function updatePanels(state) {
+    legalState.classList.toggle("hidden", !(state.detected && !state.consent))
+    neutralState.classList.toggle("hidden", state.detected)
+    consentState.classList.toggle("hidden", !state.consent)
+
+    if (state.consent) {
+        consentMessage.textContent = state.consent === "accepted" ?
+            "Thanks! We’ll analyze this page when AI results are available." :
+            "No problem. We won’t analyze this page until you’re ready."
+    }
+}
+
+function updateReasons(state) {
+    detectionReasons.innerHTML = ""
+    if (!state.detected) {
+        return
+    }
+    const items = []
+    if (state.matchedUrlKeywords?.length) {
+        items.push(`URL keywords: ${state.matchedUrlKeywords.join(", ")}`)
+    }
+    if (state.matchedContentKeywords?.length) {
+        items.push(`On-page text mentions: ${state.matchedContentKeywords.join(", ")}`)
+    }
+    if (state.matchedActionKeywords?.length) {
+        items.push(`Buttons include: ${state.matchedActionKeywords.join(", ")}`)
+    }
+    if (items.length === 0) {
+        items.push("Detected using heuristic signals.")
+    }
+    items.forEach((text) => {
+        const li = document.createElement("li")
+        li.textContent = text
+        detectionReasons.appendChild(li)
+    })
+}
