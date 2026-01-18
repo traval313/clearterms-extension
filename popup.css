@@ -58,6 +58,11 @@ h1 {
     box-shadow: 0 1px 3px rgba(16, 24, 40, 0.1);
 }
 
+.panel--error {
+    border: 1px solid #fda29b;
+    box-shadow: 0 1px 3px rgba(249, 112, 102, 0.2);
+}
+
 .panel + .panel {
     margin-top: 12px;
 }
@@ -78,6 +83,37 @@ h1 {
     font-size: 12px;
     font-weight: 600;
     margin: 0 0 6px;
+}
+
+.metaList {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+}
+
+.metaList div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.metaList dt {
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #475467;
+}
+
+.metaList dd {
+    margin: 0;
+    font-size: 13px;
+    color: #101828;
+    word-break: break-word;
+}
+
+#extractionUrl {
+    color: #475467;
 }
 
 #detectionReasons {
