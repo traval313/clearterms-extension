@@ -32,9 +32,27 @@
         <p class="muted">Visit a Terms of Service or Privacy Policy page to trigger ClearTerms.</p>
     </section>
 
-    <section id="consentState" class="panel hidden">
+    <section id="acceptedState" class="panel hidden">
+        <p class="lead" id="extractionHeadline"></p>
+        <p class="muted" id="extractionSubhead"></p>
+        <div class="panel__details hidden" id="extractionDetails">
+            <p class="panel__label">Extraction details</p>
+            <dl class="metaList">
+                <div>
+                    <dt>Page URL</dt>
+                    <dd id="extractionUrl"></dd>
+                </div>
+                <div>
+                    <dt>Characters</dt>
+                    <dd id="extractionChars"></dd>
+                </div>
+            </dl>
+        </div>
+    </section>
+
+    <section id="declinedState" class="panel hidden">
         <p class="lead" id="consentMessage"></p>
-        <p class="muted">We’ll remember your choice for this tab. Analysis features arrive in upcoming releases.</p>
+        <p class="muted">We’ll remember your choice for this tab. Open the popup again to restart analysis.</p>
     </section>
 </div>
 <script src="popup.js"></script>
