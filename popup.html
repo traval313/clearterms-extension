@@ -62,18 +62,21 @@
         <header class="panel__title">Capture status</header>
         <p class="lead" id="extractionHeadline"></p>
         <p class="muted" id="extractionSubhead"></p>
-        <div class="panel__details hidden" id="extractionDetails">
-            <p class="panel__label">Latest snapshot</p>
-            <dl class="metaList">
-                <div>
-                    <dt>URL</dt>
-                    <dd id="extractionUrl"></dd>
-                </div>
-                <div>
-                    <dt>Characters</dt>
-                    <dd id="extractionChars"></dd>
-                </div>
-            </dl>
+    </section>
+
+    <section id="analysisState" class="panel hidden" aria-live="polite">
+        <header class="panel__title">AI insights</header>
+        <p class="lead" id="analysisHeadline"></p>
+        <p class="muted" id="analysisSubhead"></p>
+        <div class="panel__details hidden" id="analysisSummaryBlock">
+            <p class="panel__label">Summary</p>
+            <p class="analysisSummary" id="analysisSummary"></p>
+        </div>
+        <div class="scoreGrid hidden" id="analysisScores" aria-label="Risk scores"></div>
+        <p class="muted hidden" id="analysisConfidence"></p>
+        <div class="panel__details hidden" id="analysisRawBlock">
+            <p class="panel__label">Gemini raw output</p>
+            <pre class="rawResponse" id="analysisRaw"></pre>
         </div>
     </section>
 
