@@ -202,35 +202,67 @@ h1 {
     color: var(--text-muted);
 }
 
-.metaList {
-    display: grid;
-    gap: 10px;
+.analysisSummary {
     margin: 0;
-    padding: 0;
+    line-height: 1.5;
+    color: var(--text);
+    font-size: 14px;
 }
 
-.metaList div {
+.scoreGrid {
+    display: grid;
+    gap: 12px;
+    margin-top: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.scoreCard {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px;
+    background: rgba(3, 7, 22, 0.7);
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 6px;
 }
 
-.metaList dt {
+.scoreCard--overall {
+    background: linear-gradient(135deg, rgba(58, 122, 254, 0.4), rgba(20, 27, 46, 0.9));
+    border-color: rgba(58, 122, 254, 0.5);
+    box-shadow: 0 12px 24px rgba(58, 122, 254, 0.25);
+}
+
+.scoreCard__label {
     font-size: 11px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--text-muted);
 }
 
-.metaList dd {
+.scoreCard__value {
+    font-size: 26px;
+    font-weight: 600;
     margin: 0;
-    font-size: 14px;
-    color: var(--text);
-    word-break: break-word;
 }
 
-#extractionUrl {
+.scoreCard__tag {
+    margin: 0;
+    font-size: 12px;
     color: var(--text-muted);
+}
+
+.rawResponse {
+    margin: 0;
+    padding: 12px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.5);
+    color: var(--text);
+    font-size: 12px;
+    line-height: 1.5;
+    max-height: 180px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
 }
 
 #detectionReasons {
