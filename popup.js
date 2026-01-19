@@ -61,11 +61,11 @@ const SCORE_LABELS = {
 }
 
 const SCORE_BANDS = [
-    {min: 90, label: "Exemplary"},
-    {min: 70, label: "User-friendly"},
-    {min: 40, label: "Caution"},
-    {min: 20, label: "High risk"},
-    {min: 0, label: "Predatory"},
+    {min: 80, level: 5, label: "Predatory"},
+    {min: 60, level: 4, label: "High Risk"},
+    {min: 40, level: 3, label: "Moderate Risk"},
+    {min: 20, level: 2, label: "Low Risk"},
+    {min: 0, level: 1, label: "Safe"},
 ]
 
 consentYes.addEventListener("click", () => submitConsent("accepted"))
@@ -437,9 +437,12 @@ function updateRiskMeter(scoreData) {
         return false
     }
     const value = Math.max(0, Math.min(100, rawValue))
+    const providedLevel = parseLevelLabel(scoreData?.finalLevel)
+    const fallbackLevel = describeScoreBand(value)
+    const levelToShow = providedLevel?.level ?? fallbackLevel.level
+    const descriptor = providedLevel?.label ?? fallbackLevel.label
     riskMeterScore.textContent = String(Math.round(value))
-    const label = scoreData?.finalLevel || describeScoreBand(value)
-    riskMeterLabel.textContent = label || ""
+    riskMeterLabel.textContent = `Level ${levelToShow} (${descriptor})`
     const rotation = -90 + (value / 100) * 180
     riskMeterNeedle.style.setProperty("--needle-rotation", `${rotation}deg`)
     return true
@@ -478,7 +481,8 @@ function renderBreakdownGrid(scoreData, justifications) {
         const rounded = Math.round(value)
         score.textContent = String(rounded)
 
-        const bandText = describeScoreBand(value)
+        const bandInfo = describeScoreBand(value)
+        const bandText = `Level ${bandInfo.level} (${bandInfo.label})`
         const band = document.createElement("p")
         band.className = "scoreCube__tag"
         band.textContent = bandText
@@ -501,16 +505,16 @@ function renderBreakdownGrid(scoreData, justifications) {
 }
 
 function scoreLevelClass(score) {
-    if (score >= 80) {
+    if (score <= 20) {
         return "scoreLevel--positive"
     }
-    if (score >= 60) {
+    if (score <= 40) {
         return "scoreLevel--steady"
     }
-    if (score >= 40) {
+    if (score <= 60) {
         return "scoreLevel--caution"
     }
-    if (score >= 20) {
+    if (score <= 80) {
         return "scoreLevel--high"
     }
     return "scoreLevel--critical"
@@ -519,10 +523,26 @@ function scoreLevelClass(score) {
 function describeScoreBand(score) {
     for (const band of SCORE_BANDS) {
         if (score >= band.min) {
-            return band.label
+            return {level: band.level, label: band.label}
         }
     }
-    return ""
+    return {level: SCORE_BANDS[SCORE_BANDS.length - 1].level, label: SCORE_BANDS[SCORE_BANDS.length - 1].label}
+}
+
+function parseLevelLabel(text) {
+    if (typeof text !== "string") {
+        return null
+    }
+    const match = text.match(/Level\s*(\d)(?:\s*\(([^)]+)\))?/i)
+    if (!match) {
+        return null
+    }
+    const level = Number(match[1])
+    if (!Number.isFinite(level)) {
+        return null
+    }
+    const label = match[2]?.trim() || `Level ${level}`
+    return {level, label}
 }
 
 function handleCategoryGridActivate(event) {

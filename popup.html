@@ -76,14 +76,20 @@
                         <svg viewBox="0 0 200 110" class="riskMeter__svg" aria-hidden="true" focusable="false">
                             <defs>
                                 <linearGradient id="riskMeterGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                    <stop offset="0%" stop-color="#ff5d8f" />
-                                    <stop offset="45%" stop-color="#ffc15a" />
-                                    <stop offset="100%" stop-color="#3af9b2" />
+                                    <stop offset="0%" stop-color="#3af9b2" />
+                                    <stop offset="55%" stop-color="#ffc15a" />
+                                    <stop offset="100%" stop-color="#ff5d8f" />
                                 </linearGradient>
                             </defs>
                             <path d="M15 100 A85 85 0 0 1 185 100" class="riskMeter__track" />
                             <path d="M25 100 A75 75 0 0 1 175 100" class="riskMeter__arc" />
                         </svg>
+                        <div class="riskMeter__ticks" aria-hidden="true">
+                            <span class="riskMeter__tick"></span>
+                            <span class="riskMeter__tick"></span>
+                            <span class="riskMeter__tick"></span>
+                            <span class="riskMeter__tick"></span>
+                        </div>
                         <div class="riskMeter__needle" id="riskMeterNeedle">
                             <span class="riskMeter__needleBody"></span>
                             <span class="riskMeter__needleCap"></span>

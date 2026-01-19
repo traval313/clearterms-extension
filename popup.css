@@ -302,8 +302,47 @@ h1 {
     bottom: 17px;
     left: 50%;
     transform-origin: bottom center;
-    transform: rotate(var(--needle-rotation, -90deg));
+    transform: rotate(var(--needle-rotation, 90deg));
     transition: transform 400ms ease-out;
+}
+
+.riskMeter__ticks {
+    position: absolute;
+    bottom: 17px;
+    left: 50%;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+.riskMeter__tick {
+    position: absolute;
+    bottom: 0;
+    left: -1px;
+    width: 2px;
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.8);
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.4);
+    transform-origin: bottom center;
+    transform: rotate(var(--tick-angle)) translateY(-70px);
+    opacity: 0.8;
+}
+
+.riskMeter__tick:nth-child(1) {
+    --tick-angle: -54deg;
+}
+
+.riskMeter__tick:nth-child(2) {
+    --tick-angle: -18deg;
+}
+
+.riskMeter__tick:nth-child(3) {
+    --tick-angle: 18deg;
+}
+
+.riskMeter__tick:nth-child(4) {
+    --tick-angle: 54deg;
 }
 
 .riskMeter__needleBody {
@@ -522,6 +561,7 @@ h1 {
     white-space: pre-line;
     padding-right: 4px;
 }
+
 
 .summaryDisclaimer {
     margin: 0;

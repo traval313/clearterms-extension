@@ -35,20 +35,20 @@ Perform a structured audit of the provided legal document using the Strict Deter
 - Worst-Case Resolution: If multiple clause types are detected within a single pillar (e.g., both "crash logs" and "biometrics"), you MUST assign the LOWEST (most harmful) applicable Level.
 
 2. The "Neutral Default" Definition
-- If NO specific clause triggers (Levels 0, 1, 2, 4, 5) are found for a pillar, you must check for "General Privacy Language."
+- If NO specific clause triggers (Levels 1, 2, 3, 4, 5) are found for a pillar, you must check for "General Privacy Language."
 - Definition: "General Privacy Language" consists of standard headers (e.g., "Information We Collect", "Security") OR generic assurances (e.g., "We value your privacy") without specific technical details.
 - Rule:
   * If General Privacy Language is PRESENT but specific triggers are ABSENT -> Assign Level 3.
-  * If the section is completely MISSING -> Assign Confidence: Low and Level 3 (Standard Default).
+  * If the section is completely MISSING -> Assign Level 3 (Standard Default).
 
 3. Fixed Numeric Mapping
+- Output risk scores where LOW numbers mean low risk/exemplary and HIGH numbers mean high risk/predatory.
 - You are NOT allowed to choose a custom score. You MUST use the exact Fixed Score below for the assigned Level:
-  * Level 5 → 95 points
-  * Level 4 → 80 points
-  * Level 3 → 60 points
-  * Level 2 → 40 points
-  * Level 1 → 25 points
-  * Level 0 → 10 points
+  * Level 1 → 5 points
+  * Level 2 → 20 points
+  * Level 3 → 40 points
+  * Level 4 → 60 points
+  * Level 5 → 100 points
 
 4. Reading Complexity Logic
 - Do not guess. Determine Reading Level based on these text features:
@@ -56,62 +56,52 @@ Perform a structured audit of the provided legal document using the Strict Deter
   * Grade 10 (Moderate): Standard business language, clear headers, sentences 15-25 words.
   * Grade 8 (Simple): Short sentences (<15 words), plain English ("we will not," "you can"), bullet points.
 
-5. Confidence Scoring Logic
-- High: Explicit triggers found for 5 out of 5 pillars.
-- Medium: Explicit triggers found for 3 or 4 pillars.
-- Low: Explicit triggers found for 0, 1, or 2 pillars.
 
 # CLAUSE-BASED AUDIT RUBRIC
 
 ## Data Collection (25%)
-- Level 5 (95): Limits collection to email, username, password, or payment only. No device IDs or analytics.
-- Level 4 (80): Mentions crash logs, diagnostics, performance data, or cookies for site functionality.
-- Level 3 (60): Mentions IP address, device ID, advertising ID, browser type, or usage data for optimization/marketing.
-- Level 2 (40): Mentions cross-site tracking, GPS/precise location, tracking pixels, or combining data with third-party sources.
-- Level 1 (25): Mentions biometrics, health data, contact lists, photos, or microphone access (unless essential to a feature).
-- Level 0 (10): Mentions keystroke logging, clipboard scanning, or background audio/video recording.
+- Level 1 (5): Limits collection to email, username, password, or payment only. No device IDs or analytics.
+- Level 2 (20): Mentions crash logs, diagnostics, performance data, or cookies for site functionality.
+- Level 3 (40): Mentions IP address, device ID, advertising ID, browser type, or usage data for optimization/marketing.
+- Level 4 (60): Mentions cross-site tracking, GPS/precise location, tracking pixels, or combining data with third-party sources.
+- Level 5 (100): Mentions biometrics, health data, contact lists, photos, or microphone access (unless essential to a feature) OR intrusive sensors like keystroke logging, clipboard scanning, or background recording.
 
 ## Data Sharing (25%)
-- Level 5 (95): Explicitly states "We do not sell or share personal data with third parties."
-- Level 4 (80): Shares only with service providers/processors/vendors for operations.
-- Level 3 (60): Shares with affiliates, subsidiaries, or corporate family.
-- Level 2 (40): Shares with partners, third parties, or ad networks for marketing/promotions/joint ventures.
-- Level 1 (25): Mentions selling/renting/leasing data, or sharing with data brokers/researchers.
-- Level 0 (10): Disclaims responsibility for third-party sites/links, or calls data a transferable asset without restriction.
+- Level 1 (5): Explicitly states "We do not sell or share personal data with third parties."
+- Level 2 (20): Shares only with service providers/processors/vendors for operations.
+- Level 3 (40): Shares with affiliates, subsidiaries, or corporate family.
+- Level 4 (60): Shares with partners, third parties, or ad networks for marketing/promotions/joint ventures.
+- Level 5 (100): Mentions selling/renting/leasing data, sharing with data brokers/researchers, disclaims responsibility for third-party sites/links, or calls data a transferable asset without restriction.
 
 ## User Control (20%)
-- Level 5 (95): Opt-in required for tracking and explicit delete-account button.
-- Level 4 (80): Dashboard/settings provided for opt-out; "Do Not Sell" link mentioned.
-- Level 3 (60): References GDPR/CCPA rights but requires emailing support or a form.
-- Level 2 (40): Rights limited to specific jurisdictions only.
-- Level 1 (25): Must contact company to opt-out with no clear process/timeline.
-- Level 0 (10): Data provision mandatory for use; no deletion rights.
+- Level 1 (5): Opt-in required for tracking and explicit delete-account button.
+- Level 2 (20): Dashboard/settings provided for opt-out; "Do Not Sell" link mentioned.
+- Level 3 (40): References GDPR/CCPA rights but requires emailing support or a form.
+- Level 4 (60): Rights limited to specific jurisdictions only.
+- Level 5 (100): Must contact company to opt-out with no clear process/timeline OR data provision mandatory for use with no deletion rights.
 
 ## Data Longevity (15%)
-- Level 5 (95): Explicit retention timeframe (e.g., deleted after 30 days or session only).
-- Level 4 (80): Deleted upon account closure or when no longer needed.
-- Level 3 (60): Retained as long as account is active.
-- Level 2 (40): Retained for business/legal purposes (open-ended).
-- Level 1 (25): "Anonymized/Aggregated" data retained indefinitely.
-- Level 0 (10): Permanent retention or irrevocable license to keep data.
+- Level 1 (5): Explicit retention timeframe (e.g., deleted after 30 days or session only).
+- Level 2 (20): Deleted upon account closure or when no longer needed.
+- Level 3 (40): Retained as long as account is active.
+- Level 4 (60): Retained for business/legal purposes (open-ended).
+- Level 5 (100): "Anonymized/Aggregated" data retained indefinitely, permanent retention, or irrevocable license to keep data.
 
 ## Legal Integrity (15%)
-- Level 5 (95): States no mandatory arbitration or user retains ownership of content.
-- Level 4 (80): Standard liability limits; no arbitration/class waiver.
-- Level 3 (60): Arbitration clause with explicit opt-out window.
-- Level 2 (40): Mandatory arbitration with no opt-out.
-- Level 1 (25): Class action waiver mentioned.
-- Level 0 (10): Waiver of jury trial AND perpetual worldwide license to user content.
+- Level 1 (5): States no mandatory arbitration or user retains ownership of content.
+- Level 2 (20): Standard liability limits; no arbitration/class waiver.
+- Level 3 (40): Arbitration clause with explicit opt-out window.
+- Level 4 (60): Mandatory arbitration with no opt-out.
+- Level 5 (100): Class action waiver, waiver of jury trial, and/or perpetual worldwide license to user content.
 
 # CALCULATIONS & FINAL LEVEL
 - Numeric Total = (Collection * 0.25) + (Sharing * 0.25) + (Control * 0.20) + (Longevity * 0.15) + (Legal * 0.15) [round to nearest whole number]
-- Map to Safety Levels:
-  * 90-100 -> Level 5 (Safe)
-  * 70-89 -> Level 4 (Fair)
-  * 50-69 -> Level 3 (Caution)
-  * 30-49 -> Level 2 (Risky)
-  * 20-29 -> Level 1 (Hazardous)
-  * 0-19 -> Level 0 (Predatory)
+- Map to Safety Levels (remember, higher scores mean higher risk):
+  * 80-100 -> Level 5 (Predatory)
+  * 60-79 -> Level 4 (High Risk)
+  * 40-59 -> Level 3 (Moderate Risk)
+  * 20-39 -> Level 2 (Low Risk)
+  * 0-19 -> Level 1 (Safe)
 
 # CATEGORY JUSTIFICATIONS
 For each pillar you MUST provide a concise justification explaining the score you assigned:
@@ -599,20 +589,17 @@ function clampScore(value) {
 }
 
 function deriveSafetyLevel(score) {
-    if (score >= 90) {
-        return "Level 5 (Safe)"
+    if (score >= 80) {
+        return "Level 5 (Predatory)"
     }
-    if (score >= 70) {
-        return "Level 4 (Fair)"
+    if (score >= 60) {
+        return "Level 4 (High Risk)"
     }
-    if (score >= 50) {
-        return "Level 3 (Caution)"
-    }
-    if (score >= 30) {
-        return "Level 2 (Risky)"
+    if (score >= 40) {
+        return "Level 3 (Moderate Risk)"
     }
     if (score >= 20) {
-        return "Level 1 (Hazardous)"
+        return "Level 2 (Low Risk)"
     }
-    return "Level 0 (Predatory)"
+    return "Level 1 (Safe)"
 }
