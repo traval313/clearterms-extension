@@ -37,6 +37,7 @@ const riskMeterNeedle = document.getElementById("riskMeterNeedle")
 const riskMeterScore = document.getElementById("riskMeterScore")
 const riskMeterLabel = document.getElementById("riskMeterLabel")
 const riskMeterHint = document.getElementById("riskMeterHint")
+const processingTrackItems = Array.from(document.querySelectorAll('.stateTrack li'))
 
 const SCORE_LABELS = {
     overall: "Overall risk",
@@ -150,6 +151,7 @@ function renderState(state) {
     updateReasons(currentState)
     updateExtractionPanel(currentState)
     updateAnalysisPanel(currentState)
+    updateProcessingTrack(currentState)
     maybeRequestAnalysis(currentState)
     syncPolling(currentState)
 }
@@ -219,6 +221,14 @@ function updateExtractionPanel(state) {
         return
     }
 
+    if (status === "success") {
+        acceptedState.classList.add("hidden")
+        acceptedState.classList.remove("panel--error")
+        return
+    }
+
+    acceptedState.classList.remove("hidden")
+
     switch (status) {
     case "pending":
         headline = "Extracting legal text…"
@@ -240,6 +250,43 @@ function updateExtractionPanel(state) {
     extractionHeadline.textContent = headline
     extractionSubhead.textContent = subhead
     acceptedState.classList.toggle("panel--error", status === "error")
+}
+
+function updateProcessingTrack(state) {
+    if (!processingTrackItems.length) {
+        return
+    }
+    const active = deriveProcessingStage(state)
+    processingTrackItems.forEach((item) => {
+        const step = item.getAttribute('data-state') || ""
+        item.classList.toggle("is-active", step === active)
+    })
+}
+
+function deriveProcessingStage(state) {
+    const extractionStatus = state.extractionStatus || "idle"
+    const analysisStatus = state.analysisStatus || "idle"
+
+    if (analysisStatus === "success") {
+        return "preview"
+    }
+
+    const consented = state.consent === "accepted"
+    const extractionInFlight = extractionStatus === "pending"
+    const analysisInFlight = analysisStatus === "pending"
+    const extractionFinished = extractionStatus === "success"
+    const extractionFailed = extractionStatus === "error"
+    const analysisFailed = analysisStatus === "error"
+
+    if (consented && (extractionInFlight || analysisInFlight || extractionFinished || extractionFailed || analysisFailed)) {
+        return "loading"
+    }
+
+    if (state.detected) {
+        return "detected"
+    }
+
+    return "idle"
 }
 
 function updateAnalysisPanel(state) {
