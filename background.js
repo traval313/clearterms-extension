@@ -113,6 +113,13 @@ Perform a structured audit of the provided legal document using the Strict Deter
   * 20-29 -> Level 1 (Hazardous)
   * 0-19 -> Level 0 (Predatory)
 
+# CATEGORY JUSTIFICATIONS
+For each pillar you MUST provide a concise justification explaining the score you assigned:
+- Limit yourself to 1-2 sentences per pillar.
+- Reference the exact behavior or language from the text (quote or paraphrase specific clauses). No speculation.
+- No legal advice.
+- These are justifications for the score, not a summary of the whole section.
+
 # OUTPUT FORMAT
 Output JSON ONLY. No markdown.
 {
@@ -127,6 +134,13 @@ Output JSON ONLY. No markdown.
       "data_longevity": 0,
       "legal_integrity": 0
     }
+  },
+  "justifications": {
+    "data_collection": "1-2 sentence justification referencing the document text for why this category earned its score.",
+    "data_sharing": "...",
+    "user_control": "...",
+    "data_longevity": "...",
+    "legal_integrity": "..."
   }
 }
 
@@ -306,8 +320,8 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 /**
  * @typedef {Object} LegalAnalysisResult
  * @property {string} summary
- * @property {{overall:number,data_collection:number,data_sharing:number,tracking:number,user_rights:number,payments:number}} scores
- * @property {string} confidence_notes
+ * @property {{overall:number, finalLevel:string, breakdown:{data_collection:number,data_sharing:number,user_control:number,data_longevity:number,legal_integrity:number}}} scores
+ * @property {{data_collection:string,data_sharing:string,user_control:string,data_longevity:string,legal_integrity:string}} justifications
  */
 
 function startExtractionForTab(tabId) {
@@ -553,14 +567,20 @@ function normalizeAnalysisPayload(payload) {
     const finalLevel = typeof scoresBlock.final_level === "string" ? scoresBlock.final_level.trim() : deriveSafetyLevel(overall)
 
     const breakdownSource = typeof scoresBlock.breakdown === "object" && scoresBlock.breakdown !== null ? scoresBlock.breakdown : {}
-    const breakdownKeys = ["data_collection", "data_sharing", "user_control", "data_longevity", "legal_integrity"]
+    const justificationSource = typeof payload.justifications === "object" && payload.justifications !== null ? payload.justifications : {}
+    const categoryKeys = ["data_collection", "data_sharing", "user_control", "data_longevity", "legal_integrity"]
     const normalizedBreakdown = {}
-    for (const key of breakdownKeys) {
+    const normalizedJustifications = {}
+    const missingMessage = "Gemini did not provide a justification for this category."
+    for (const key of categoryKeys) {
         const value = Number(breakdownSource[key])
         if (!Number.isFinite(value)) {
             throw new Error(`Gemini breakdown score for ${key} is invalid.`)
         }
         normalizedBreakdown[key] = clampScore(value)
+
+        const justification = typeof justificationSource[key] === "string" ? justificationSource[key].trim() : ""
+        normalizedJustifications[key] = justification || missingMessage
     }
 
     return {
@@ -570,6 +590,7 @@ function normalizeAnalysisPayload(payload) {
             finalLevel: finalLevel || deriveSafetyLevel(overall),
             breakdown: normalizedBreakdown,
         },
+        justifications: normalizedJustifications,
     }
 }
 

@@ -102,6 +102,15 @@
             <div class="analysisView hidden" id="analysisBreakdownView" aria-live="polite">
                 <p class="panel__label">Category breakdown</p>
                 <div class="categoryGrid" id="analysisBreakdownGrid" aria-label="Category scores"></div>
+                <div class="categoryDetail hidden" id="categoryDetail" role="dialog" aria-label="Category details" aria-modal="true" aria-hidden="true">
+                    <button id="categoryDetailBack" class="chipButton categoryDetail__back" type="button">Back</button>
+                    <article class="categoryDetail__card" id="categoryDetailCard">
+                        <p class="categoryDetail__label" id="categoryDetailLabel"></p>
+                        <p class="categoryDetail__score" id="categoryDetailScore">--</p>
+                        <p class="categoryDetail__tag" id="categoryDetailTag"></p>
+                        <p class="categoryDetail__text" id="categoryDetailText"></p>
+                    </article>
+                </div>
             </div>
             <div class="analysisView hidden" id="analysisSummaryView" aria-live="polite">
                 <p class="panel__label">Summary</p>

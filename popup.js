@@ -9,6 +9,11 @@ let hasBreakdownData = false
 let hasSummaryData = false
 let hasMeterData = false
 let detectionRefreshPending = false
+let categoryDetailData = {}
+let expandedCategoryKey = null
+let expandedCategoryElement = null
+let categoryDetailAnimating = false
+let detectionScriptInjectionPending = false
 
 const detectionBadge = document.getElementById("detectionBadge")
 const legalState = document.getElementById("legalState")
@@ -33,6 +38,13 @@ const analysisSummaryView = document.getElementById("analysisSummaryView")
 const analysisSummary = document.getElementById("analysisSummary")
 const analysisSummaryButton = document.getElementById("analysisSummaryButton")
 const analysisBackButton = document.getElementById("analysisBackButton")
+const categoryDetail = document.getElementById("categoryDetail")
+const categoryDetailCard = document.getElementById("categoryDetailCard")
+const categoryDetailBack = document.getElementById("categoryDetailBack")
+const categoryDetailLabel = document.getElementById("categoryDetailLabel")
+const categoryDetailScore = document.getElementById("categoryDetailScore")
+const categoryDetailTag = document.getElementById("categoryDetailTag")
+const categoryDetailText = document.getElementById("categoryDetailText")
 const riskMeterNeedle = document.getElementById("riskMeterNeedle")
 const riskMeterScore = document.getElementById("riskMeterScore")
 const riskMeterLabel = document.getElementById("riskMeterLabel")
@@ -78,6 +90,15 @@ analysisSummaryButton?.addEventListener("click", () => {
 })
 
 analysisBackButton?.addEventListener("click", () => setAnalysisView("meter"))
+analysisBreakdownGrid?.addEventListener("click", handleCategoryGridActivate)
+analysisBreakdownGrid?.addEventListener("keydown", handleCategoryGridKeydown)
+categoryDetailBack?.addEventListener("click", () => collapseCategoryDetail())
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && isCategoryDetailOpen()) {
+        event.preventDefault()
+        collapseCategoryDetail()
+    }
+})
 
 document.addEventListener("DOMContentLoaded", () => {
     chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
@@ -309,6 +330,8 @@ function updateAnalysisPanel(state) {
     if (analysisBreakdownGrid) {
         analysisBreakdownGrid.innerHTML = ""
     }
+    categoryDetailData = {}
+    collapseCategoryDetail(true)
 
     hasBreakdownData = false
     hasSummaryData = false
@@ -340,7 +363,7 @@ function updateAnalysisPanel(state) {
                 analysisSummary.textContent = result.summary.trim()
             }
             hasMeterData = updateRiskMeter(result.scores)
-            hasBreakdownData = renderBreakdownGrid(result.scores)
+            hasBreakdownData = renderBreakdownGrid(result.scores, result.justifications)
             analysisSummaryButton && (analysisSummaryButton.disabled = !hasSummaryData)
             analysisMeterView?.classList.toggle("is-disabled", !hasBreakdownData)
             if (analysisMeterInteractive) {
@@ -392,6 +415,9 @@ function setAnalysisView(view) {
     analysisBreakdownView?.classList.toggle("hidden", currentAnalysisView !== "breakdown")
     analysisSummaryView?.classList.toggle("hidden", currentAnalysisView !== "summary")
     analysisBackButton?.classList.toggle("hidden", currentAnalysisView === "meter")
+    if (currentAnalysisView !== "breakdown") {
+        collapseCategoryDetail(true)
+    }
 }
 
 function handleMeterActivate() {
@@ -419,12 +445,14 @@ function updateRiskMeter(scoreData) {
     return true
 }
 
-function renderBreakdownGrid(scoreData) {
+function renderBreakdownGrid(scoreData, justifications) {
     if (!analysisBreakdownGrid) {
         return false
     }
     analysisBreakdownGrid.innerHTML = ""
+    analysisBreakdownGrid.classList.remove("is-inactive")
     const breakdown = scoreData?.breakdown && typeof scoreData.breakdown === "object" ? scoreData.breakdown : {}
+    const explanationSource = justifications && typeof justifications === "object" ? justifications : {}
     let rendered = false
     const order = ["data_collection", "data_sharing", "user_control", "data_longevity", "legal_integrity"]
     order.forEach((key) => {
@@ -436,18 +464,35 @@ function renderBreakdownGrid(scoreData) {
         const value = Math.max(0, Math.min(100, raw))
         const cube = document.createElement("div")
         cube.className = `scoreCube ${scoreLevelClass(value)}`
+        cube.setAttribute("tabindex", "0")
+        cube.setAttribute("role", "button")
+        cube.setAttribute("data-category-key", key)
 
+        const labelCopy = SCORE_LABELS[key] || key
         const label = document.createElement("p")
         label.className = "scoreCube__label"
-        label.textContent = SCORE_LABELS[key] || key
+        label.textContent = labelCopy
 
         const score = document.createElement("p")
         score.className = "scoreCube__value"
-        score.textContent = String(Math.round(value))
+        const rounded = Math.round(value)
+        score.textContent = String(rounded)
 
+        const bandText = describeScoreBand(value)
         const band = document.createElement("p")
         band.className = "scoreCube__tag"
-        band.textContent = describeScoreBand(value)
+        band.textContent = bandText
+
+        cube.setAttribute("aria-label", `${labelCopy} scored ${rounded}. View Gemini's justification.`)
+
+        const explanationRaw = typeof explanationSource[key] === "string" ? explanationSource[key].trim() : ""
+        const explanation = explanationRaw || "Gemini did not provide a justification for this category."
+        categoryDetailData[key] = {
+            label: labelCopy,
+            score: value,
+            band: bandText,
+            explanation,
+        }
 
         cube.append(label, score, band)
         analysisBreakdownGrid.appendChild(cube)
@@ -478,6 +523,194 @@ function describeScoreBand(score) {
         }
     }
     return ""
+}
+
+function handleCategoryGridActivate(event) {
+    const target = event.target
+    if (!target || typeof target.closest !== "function") {
+        return
+    }
+    const cube = target.closest(".scoreCube")
+    if (cube) {
+        openCategoryDetail(cube)
+    }
+}
+
+function handleCategoryGridKeydown(event) {
+    if (event.key !== "Enter" && event.key !== " " && event.key !== "Spacebar") {
+        return
+    }
+    const target = event.target
+    if (!target || typeof target.closest !== "function") {
+        return
+    }
+    const cube = target.closest(".scoreCube")
+    if (!cube) {
+        return
+    }
+    event.preventDefault()
+    openCategoryDetail(cube)
+}
+
+function openCategoryDetail(cube) {
+    if (!categoryDetail || !categoryDetailCard || categoryDetailAnimating || isCategoryDetailOpen()) {
+        return
+    }
+    const key = cube.getAttribute("data-category-key") || ""
+    if (!key) {
+        return
+    }
+    const detail = categoryDetailData[key]
+    if (!detail) {
+        return
+    }
+    expandedCategoryKey = key
+    expandedCategoryElement = cube
+    categoryDetailLabel && (categoryDetailLabel.textContent = detail.label)
+    categoryDetailScore && (categoryDetailScore.textContent = String(Math.round(detail.score)))
+    categoryDetailTag && (categoryDetailTag.textContent = detail.band)
+    categoryDetailText && (categoryDetailText.textContent = detail.explanation)
+    analysisBreakdownGrid?.classList.add("is-inactive")
+    analysisBreakdownGrid?.setAttribute("aria-hidden", "true")
+    analysisBreakdownView?.classList.add("is-detail")
+    categoryDetail.classList.remove("hidden")
+    categoryDetail.setAttribute("aria-hidden", "false")
+    const sourceRect = cube.getBoundingClientRect()
+    playCategoryDetailAnimation("expand", sourceRect).then(() => {
+        categoryDetailBack?.focus({preventScroll: true})
+    })
+}
+
+function collapseCategoryDetail(skipAnimation = false) {
+    if (!categoryDetail) {
+        expandedCategoryElement = null
+        expandedCategoryKey = null
+        analysisBreakdownGrid?.classList.remove("is-inactive")
+        analysisBreakdownGrid?.setAttribute("aria-hidden", "false")
+        analysisBreakdownView?.classList.remove("is-detail")
+        return
+    }
+    if (!isCategoryDetailOpen()) {
+        analysisBreakdownGrid?.classList.remove("is-inactive")
+        analysisBreakdownGrid?.setAttribute("aria-hidden", "false")
+        analysisBreakdownView?.classList.remove("is-detail")
+        expandedCategoryElement = null
+        expandedCategoryKey = null
+        categoryDetail.classList.add("hidden")
+        categoryDetail.setAttribute("aria-hidden", "true")
+        return
+    }
+    const origin = expandedCategoryElement
+    const finish = () => {
+        categoryDetail.classList.add("hidden")
+        categoryDetail.setAttribute("aria-hidden", "true")
+        analysisBreakdownGrid?.classList.remove("is-inactive")
+        analysisBreakdownGrid?.setAttribute("aria-hidden", "false")
+        analysisBreakdownView?.classList.remove("is-detail")
+        const focusTarget = origin
+        expandedCategoryElement = null
+        expandedCategoryKey = null
+        if (focusTarget && typeof focusTarget.focus === "function") {
+            requestAnimationFrame(() => focusTarget.focus({preventScroll: true}))
+        }
+    }
+    if (skipAnimation || !origin) {
+        stopCategoryDetailAnimations()
+        finish()
+        return
+    }
+    const sourceRect = origin.getBoundingClientRect()
+    playCategoryDetailAnimation("collapse", sourceRect).then(finish)
+}
+
+function isCategoryDetailOpen() {
+    return Boolean(categoryDetail && !categoryDetail.classList.contains("hidden"))
+}
+
+function playCategoryDetailAnimation(mode, sourceRect) {
+    if (!categoryDetailCard || !sourceRect || prefersReducedMotion()) {
+        return Promise.resolve()
+    }
+    const detailRect = categoryDetailCard.getBoundingClientRect()
+    if (!detailRect.width || !detailRect.height) {
+        return Promise.resolve()
+    }
+    stopCategoryDetailAnimations()
+    const deltaX = sourceRect.left - detailRect.left
+    const deltaY = sourceRect.top - detailRect.top
+    const scaleX = sourceRect.width / detailRect.width
+    const scaleY = sourceRect.height / detailRect.height
+    const rotate = mode === "expand" ? -18 : 18
+    const frames = mode === "expand" ? [
+        {transform: `translate(${deltaX}px, ${deltaY}px) scale(${scaleX}, ${scaleY}) rotateY(${rotate}deg)`, opacity: 0},
+        {transform: "translate(0, 0) scale(1, 1) rotateY(0deg)", opacity: 1},
+    ] : [
+        {transform: "translate(0, 0) scale(1, 1) rotateY(0deg)", opacity: 1},
+        {transform: `translate(${deltaX}px, ${deltaY}px) scale(${scaleX}, ${scaleY}) rotateY(${rotate}deg)`, opacity: 0},
+    ]
+    categoryDetailAnimating = true
+    const animation = categoryDetailCard.animate(frames, {
+        duration: 380,
+        easing: "cubic-bezier(0.4, 0, 0.2, 1)",
+        fill: "forwards",
+    })
+    return new Promise((resolve) => {
+        const handleFinish = () => {
+            categoryDetailAnimating = false
+            categoryDetailCard.style.transform = ""
+            categoryDetailCard.style.opacity = ""
+            resolve()
+        }
+        animation.addEventListener("finish", handleFinish, {once: true})
+        animation.addEventListener("cancel", handleFinish, {once: true})
+    })
+}
+
+function prefersReducedMotion() {
+    return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+}
+
+function stopCategoryDetailAnimations() {
+    if (!categoryDetailCard || typeof categoryDetailCard.getAnimations !== "function") {
+        categoryDetailAnimating = false
+        return
+    }
+    const running = categoryDetailCard.getAnimations()
+    running.forEach((animation) => animation.cancel())
+    categoryDetailAnimating = false
+}
+
+function shouldAttemptContentScriptInjection(errorMessage) {
+    if (!errorMessage) {
+        return false
+    }
+    if (!chrome.scripting || typeof chrome.scripting.executeScript !== "function") {
+        return false
+    }
+    return errorMessage.includes("Could not establish connection")
+}
+
+function injectDetectionContentScript() {
+    if (detectionScriptInjectionPending) {
+        return Promise.reject(new Error("Content script injection already in progress."))
+    }
+    if (typeof activeTabId !== "number") {
+        return Promise.reject(new Error("No active tab available for injection."))
+    }
+    detectionScriptInjectionPending = true
+    return new Promise((resolve, reject) => {
+        chrome.scripting.executeScript({
+            target: {tabId: activeTabId},
+            files: ["content.js"],
+        }, () => {
+            detectionScriptInjectionPending = false
+            if (chrome.runtime.lastError) {
+                reject(chrome.runtime.lastError)
+                return
+            }
+            resolve(true)
+        })
+    })
 }
 
 function scrollAnalysisViewIntoFocus(element) {
@@ -547,7 +780,10 @@ function maybeRequestDetectionRefresh(state) {
     if (typeof activeTabId !== "number") {
         return
     }
-    if (state && typeof state.lastUpdated === "number") {
+    const lastUpdate = typeof state?.lastUpdated === "number" ? state.lastUpdated : 0
+    const detectionMissing = !state?.detected
+    const isStale = !lastUpdate || Date.now() - lastUpdate > 5000
+    if (!detectionMissing && !isStale) {
         return
     }
     requestDetectionRefresh()
@@ -564,7 +800,15 @@ function requestDetectionRefresh() {
     chrome.tabs.sendMessage(activeTabId, {type: "REQUEST_DETECTION_REFRESH"}, () => {
         detectionRefreshPending = false
         if (chrome.runtime.lastError) {
-            console.debug("Detection refresh unavailable", chrome.runtime.lastError.message)
+            const message = chrome.runtime.lastError.message || ""
+            console.debug("Detection refresh unavailable", message)
+            if (shouldAttemptContentScriptInjection(message)) {
+                injectDetectionContentScript().then(() => {
+                    requestDetectionRefresh()
+                }).catch((error) => {
+                    console.debug("Content script injection failed", error?.message || error)
+                })
+            }
             return
         }
         requestStateRefreshSoon()
