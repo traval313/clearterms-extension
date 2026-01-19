@@ -8,6 +8,7 @@ let currentAnalysisView = "meter"
 let hasBreakdownData = false
 let hasSummaryData = false
 let hasMeterData = false
+let detectionRefreshPending = false
 
 const detectionBadge = document.getElementById("detectionBadge")
 const legalState = document.getElementById("legalState")
@@ -91,6 +92,7 @@ document.addEventListener("DOMContentLoaded", () => {
 function fetchDetectionState() {
     if (typeof activeTabId !== "number") {
         renderState(null)
+        maybeRequestDetectionRefresh(null)
         return
     }
     chrome.runtime.sendMessage({
@@ -100,9 +102,11 @@ function fetchDetectionState() {
         if (chrome.runtime.lastError) {
             console.warn("Unable to fetch detection state", chrome.runtime.lastError)
             renderState(null)
+            maybeRequestDetectionRefresh(null)
             return
         }
         renderState(response)
+        maybeRequestDetectionRefresh(response)
     })
 }
 
@@ -490,6 +494,34 @@ function syncPolling(state) {
         clearTimeout(pollingHandle)
         pollingHandle = null
     }
+}
+
+function maybeRequestDetectionRefresh(state) {
+    if (typeof activeTabId !== "number") {
+        return
+    }
+    if (state && typeof state.lastUpdated === "number") {
+        return
+    }
+    requestDetectionRefresh()
+}
+
+function requestDetectionRefresh() {
+    if (detectionRefreshPending) {
+        return
+    }
+    if (typeof activeTabId !== "number") {
+        return
+    }
+    detectionRefreshPending = true
+    chrome.tabs.sendMessage(activeTabId, {type: "REQUEST_DETECTION_REFRESH"}, () => {
+        detectionRefreshPending = false
+        if (chrome.runtime.lastError) {
+            console.debug("Detection refresh unavailable", chrome.runtime.lastError.message)
+            return
+        }
+        requestStateRefreshSoon()
+    })
 }
 
 function requestStateRefreshSoon() {
