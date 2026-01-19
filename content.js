@@ -90,9 +90,11 @@ const BLOCK_ELEMENTS = new Set([
 let lastDetection = null
 let pendingEvaluation = false
 let extractionInProgress = false
+let lastLifecycleRefresh = 0
 
 evaluateDetection(true)
 setupDomObserver()
+setupPageLifecycleListeners()
 setupMessageListener()
 
 function setupDomObserver() {
@@ -104,6 +106,32 @@ function setupDomObserver() {
         childList: true,
         subtree: true,
     })
+}
+
+function setupPageLifecycleListeners() {
+    window.addEventListener("pageshow", () => evaluateDetection(true))
+    window.addEventListener("hashchange", () => scheduleEvaluation())
+    window.addEventListener("popstate", () => scheduleEvaluation())
+    window.addEventListener("focus", () => {
+        if (document.hidden) {
+            return
+        }
+        requestLifecycleDetection()
+    })
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+            requestLifecycleDetection()
+        }
+    })
+}
+
+function requestLifecycleDetection() {
+    const now = Date.now()
+    if (now - lastLifecycleRefresh < 500) {
+        return
+    }
+    lastLifecycleRefresh = now
+    evaluateDetection(true)
 }
 
 function scheduleEvaluation() {
@@ -134,6 +162,13 @@ function setupMessageListener() {
                 sendResponse({started: true})
             }
             queueMicrotask(() => runLegalTextExtraction())
+            return false
+        }
+        if (message.type === "REQUEST_DETECTION_REFRESH") {
+            evaluateDetection(true)
+            if (sendResponse) {
+                sendResponse({refreshed: true})
+            }
             return false
         }
         return undefined
