@@ -89,6 +89,81 @@ h1 {
     font-size: 13px;
 }
 
+.apiKeyForm {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.inputLabel {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+}
+
+.textInput {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: rgba(8, 10, 20, 0.8);
+    color: var(--text);
+    font-size: 14px;
+}
+
+.textInput:focus-visible {
+    outline: none;
+    border-color: var(--border-strong);
+    box-shadow: 0 0 0 3px rgba(58, 122, 254, 0.25);
+}
+
+.formMessage {
+    font-size: 13px;
+    margin: 0;
+}
+
+.formMessage--error {
+    color: #ff9c9c;
+}
+
+.formMessage--success {
+    color: #6fffd2;
+}
+
+.apiKeyActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+}
+
+.apiKeyControls {
+    display: flex;
+    justify-content: flex-end;
+    margin: 8px 0 12px;
+}
+
+.linkButton.is-highlighted {
+    color: #4ce6c4;
+    text-decoration-color: #4ce6c4;
+    font-weight: 700;
+    animation: apiKeyPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes apiKeyPulse {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
 .badge {
     background-color: rgba(15, 48, 93, 0.8);
     border-radius: 999px;
