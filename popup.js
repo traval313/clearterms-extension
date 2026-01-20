@@ -580,16 +580,16 @@ function renderBreakdownGrid(scoreData, justifications) {
 }
 
 function scoreLevelClass(score) {
-    if (score <= 20) {
+    if (score < 20) {
         return "scoreLevel--positive"
     }
-    if (score <= 40) {
+    if (score < 40) {
         return "scoreLevel--steady"
     }
-    if (score <= 60) {
+    if (score < 60) {
         return "scoreLevel--caution"
     }
-    if (score <= 80) {
+    if (score < 80) {
         return "scoreLevel--high"
     }
     return "scoreLevel--critical"
