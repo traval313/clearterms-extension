@@ -136,8 +136,6 @@ Output JSON ONLY. No markdown.
 
 Analyze ONLY the provided document text. If information is missing, state that clearly.`
 
-let geminiKeyPromise = null
-
 /**
  * Returns an empty detection state object.
  */
@@ -267,6 +265,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return false
     }
 
+    if (message.type === "RESET_TAB_STATE" && typeof message.tabId === "number") {
+        resetDetectionWorkflow(message.tabId)
+        sendResponse?.({ok: true})
+        return false
+    }
+
     return undefined
 })
 
@@ -384,7 +388,7 @@ async function runGeminiAnalysis(tabId) {
     try {
         const apiKey = await getGeminiApiKey()
         if (!apiKey) {
-            throw new Error("Gemini API key missing. Add it to config.json before running analysis.")
+            throw createApiKeyIssue("Add your Gemini API key in the popup to enable AI analysis.", "missing")
         }
 
         const prompt = buildGeminiPrompt(extraction)
@@ -401,7 +405,14 @@ async function runGeminiAnalysis(tabId) {
         if (controller.signal.aborted) {
             return
         }
-        const message = error instanceof Error ? error.message : "Unable to analyze legal text."
+        let message = error instanceof Error ? error.message : "Unable to analyze legal text."
+        if (error?.apiKeyIssue === "invalid") {
+            await resetStoredGeminiKey("Gemini rejected the stored API key. Please Reset the API Key.")
+            resetDetectionWorkflow(tabId)
+            message = "Gemini rejected the stored API key. Please Reset the API Key."
+        } else if (error?.apiKeyIssue === "missing") {
+            message = "Add your Gemini API key in the popup to enable AI analysis."
+        }
         updateDetectionState(tabId, {
             analysisStatus: "error",
             analysisResult: null,
@@ -415,32 +426,17 @@ async function runGeminiAnalysis(tabId) {
 }
 
 async function getGeminiApiKey() {
-    if (!geminiKeyPromise) {
-        geminiKeyPromise = (async () => {
-            try {
-                const url = chrome.runtime.getURL("config.json")
-                const response = await fetch(url, {cache: "no-store"})
-                if (!response.ok) {
-                    return null
-                }
-                const data = await response.json()
-                const key = typeof data?.GEMINI_API_KEY === "string" ? data.GEMINI_API_KEY.trim() : ""
-                return key || null
-            } catch (error) {
-                console.warn("Unable to read config.json", error)
-                return null
-            }
-        })()
-    }
-    return geminiKeyPromise
+    const data = await readFromStorage(["geminiApiKey"])
+    const key = typeof data?.geminiApiKey === "string" ? data.geminiApiKey.trim() : ""
+    return key || null
 }
 
 async function requestGeminiAnalysis(apiKey, prompt, signal) {
-    const url = `${GEMINI_API_ENDPOINT}?key=${encodeURIComponent(apiKey)}`
-    const response = await fetch(url, {
+    const response = await fetch(GEMINI_API_ENDPOINT, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
+            "x-goog-api-key": apiKey,
         },
         body: JSON.stringify({
             contents: [{
@@ -459,8 +455,14 @@ async function requestGeminiAnalysis(apiKey, prompt, signal) {
 
     if (!response.ok) {
         const errorPayload = await response.json().catch(() => ({}))
-        const message = errorPayload?.error?.message || `Gemini API error (${response.status})`
-        throw new Error(message)
+        let message = errorPayload?.error?.message || `Gemini API error (${response.status})`
+        const error = new Error(message)
+        if (response.status === 401 || response.status === 403) {
+            message = "API key not valid. Please Reset the API Key."
+            error.message = message
+            error.apiKeyIssue = "invalid"
+        }
+        throw error
     }
 
     const payload = await response.json()
@@ -602,4 +604,74 @@ function deriveSafetyLevel(score) {
         return "Level 2 (Low Risk)"
     }
     return "Level 1 (Safe)"
+}
+
+function createApiKeyIssue(message, reason) {
+    const error = new Error(message)
+    error.apiKeyIssue = reason
+    return error
+}
+
+async function resetStoredGeminiKey(statusMessage) {
+    if (statusMessage) {
+        await writeToStorage({geminiApiKeyStatus: statusMessage})
+    }
+    await removeFromStorage(["geminiApiKey"])
+}
+
+function readFromStorage(keys) {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(keys, (items) => {
+            if (chrome.runtime.lastError) {
+                console.warn("Storage read failed", chrome.runtime.lastError)
+                resolve({})
+                return
+            }
+            resolve(items || {})
+        })
+    })
+}
+
+function writeToStorage(values) {
+    return new Promise((resolve) => {
+        chrome.storage.local.set(values, () => {
+            if (chrome.runtime.lastError) {
+                console.warn("Storage write failed", chrome.runtime.lastError)
+            }
+            resolve()
+        })
+    })
+}
+
+function removeFromStorage(keys) {
+    const keyArray = Array.isArray(keys) ? keys : [keys]
+    return new Promise((resolve) => {
+        chrome.storage.local.remove(keyArray, () => {
+            if (chrome.runtime.lastError) {
+                console.warn("Storage remove failed", chrome.runtime.lastError)
+            }
+            resolve()
+        })
+    })
+}
+
+function resetDetectionWorkflow(tabId) {
+    cancelAnalysisForTab(tabId)
+    const existing = detectionState.get(tabId)
+    if (!existing) {
+        detectionState.delete(tabId)
+        return
+    }
+    const nextState = {
+        ...existing,
+        consent: null,
+        extractionStatus: "idle",
+        extractionResult: null,
+        extractionError: null,
+        analysisStatus: "idle",
+        analysisResult: null,
+        analysisError: null,
+        lastUpdated: Date.now(),
+    }
+    detectionState.set(tabId, nextState)
 }

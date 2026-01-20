@@ -7,130 +7,151 @@
 </head>
 <body>
 <div class="popup">
-    <header class="popup__header">
-        <div class="brand">
-            <span class="brand__glyph" aria-hidden="true"></span>
-            <div>
-                <p class="eyebrow">ClearTerms</p>
-                <h1>Signal monitor</h1>
+    <section id="apiKeyState" class="panel hidden" aria-live="polite">
+        <header class="panel__title">API key required</header>
+        <p class="lead">To analyze legal documents, ClearTerms needs a Gemini API key.</p>
+        <p class="muted">We store the key securely in Chrome and never sync it to any server.</p>
+        <form id="apiKeyForm" class="apiKeyForm">
+            <label class="inputLabel" for="apiKeyInput">Gemini API key</label>
+            <input type="password" id="apiKeyInput" class="textInput" placeholder="Enter your key" autocomplete="off" spellcheck="false" required>
+            <p id="apiKeyMessage" class="formMessage hidden" aria-live="polite"></p>
+            <div class="apiKeyActions">
+                <button type="submit" id="apiKeySaveButton" class="btn btn--primary">Save key</button>
+                <button type="button" id="apiKeyHelpLink" class="linkButton">Where do I get a Gemini API key?</button>
             </div>
-        </div>
-        <span class="badge" id="detectionBadge">Detecting…</span>
-    </header>
-
-    <p class="subtitle">We quietly watch for legal documents, then surface only what matters.</p>
-
-    <ul class="stateTrack" aria-label="Detection progress">
-        <li data-state="idle">
-            <span class="stateTrack__dot"></span>
-            <span class="stateTrack__label">Idle</span>
-        </li>
-        <li data-state="detected">
-            <span class="stateTrack__dot"></span>
-            <span class="stateTrack__label">Detected</span>
-        </li>
-        <li data-state="loading">
-            <span class="stateTrack__dot"></span>
-            <span class="stateTrack__label">Loading</span>
-        </li>
-        <li data-state="preview">
-            <span class="stateTrack__dot"></span>
-            <span class="stateTrack__label">Preview</span>
-        </li>
-    </ul>
-
-    <section id="legalState" class="panel hidden" aria-live="polite">
-        <header class="panel__title">Signals triggered</header>
-        <p class="lead">This page looks like a Terms or Privacy notice. Ready for a capture?</p>
-        <div class="panel__details">
-            <p class="panel__label">Why we paused here</p>
-            <ul id="detectionReasons"></ul>
-        </div>
-        <div class="actions">
-            <button id="consentYes" class="btn btn--primary">Start capture</button>
-            <button id="consentNo" class="btn">Ignore</button>
-        </div>
+        </form>
     </section>
 
-    <section id="neutralState" class="panel hidden" aria-live="polite">
-        <header class="panel__title">Idle mode</header>
-        <p class="lead">No legal text detected yet.</p>
-        <p class="muted">Open a Terms of Service or Privacy Policy page to activate monitoring.</p>
-    </section>
+    <div class="apiKeyControls hidden" id="apiKeyControls">
+        <button id="apiKeyResetButton" type="button" class="linkButton">Reset API key</button>
+    </div>
 
-    <section id="acceptedState" class="panel hidden" aria-live="polite">
-        <header class="panel__title">Capture status</header>
-        <p class="lead" id="extractionHeadline"></p>
-        <p class="muted" id="extractionSubhead"></p>
-    </section>
+    <div id="extensionContent">
+        <header class="popup__header">
+            <div class="brand">
+                <span class="brand__glyph" aria-hidden="true"></span>
+                <div>
+                    <p class="eyebrow">ClearTerms</p>
+                    <h1>Signal monitor</h1>
+                </div>
+            </div>
+            <span class="badge" id="detectionBadge">Detecting…</span>
+        </header>
 
-    <section id="analysisState" class="panel hidden" aria-live="polite">
-        <header class="panel__title">AI insights</header>
-        <p class="lead" id="analysisHeadline"></p>
-        <p class="muted" id="analysisSubhead"></p>
-        <div class="analysisViews hidden" id="analysisContent">
-            <button id="analysisBackButton" class="chipButton hidden" type="button">Back</button>
-            <div class="analysisView" id="analysisMeterView" aria-live="polite">
-                <div id="analysisMeterInteractive" class="riskMeter" role="button" tabindex="0" aria-label="View category breakdown">
-                    <div class="riskMeter__dial">
-                        <svg viewBox="0 0 200 110" class="riskMeter__svg" aria-hidden="true" focusable="false">
-                            <defs>
-                                <linearGradient id="riskMeterGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                    <stop offset="0%" stop-color="#3af9b2" />
-                                    <stop offset="55%" stop-color="#ffc15a" />
-                                    <stop offset="100%" stop-color="#ff5d8f" />
-                                </linearGradient>
-                            </defs>
-                            <path d="M15 100 A85 85 0 0 1 185 100" class="riskMeter__track" />
-                            <path d="M25 100 A75 75 0 0 1 175 100" class="riskMeter__arc" />
-                        </svg>
-                        <div class="riskMeter__ticks" aria-hidden="true">
-                            <span class="riskMeter__tick"></span>
-                            <span class="riskMeter__tick"></span>
-                            <span class="riskMeter__tick"></span>
-                            <span class="riskMeter__tick"></span>
+        <p class="subtitle">We quietly watch for legal documents, then surface only what matters.</p>
+
+        <ul class="stateTrack" aria-label="Detection progress">
+            <li data-state="idle">
+                <span class="stateTrack__dot"></span>
+                <span class="stateTrack__label">Idle</span>
+            </li>
+            <li data-state="detected">
+                <span class="stateTrack__dot"></span>
+                <span class="stateTrack__label">Detected</span>
+            </li>
+            <li data-state="loading">
+                <span class="stateTrack__dot"></span>
+                <span class="stateTrack__label">Loading</span>
+            </li>
+            <li data-state="preview">
+                <span class="stateTrack__dot"></span>
+                <span class="stateTrack__label">Preview</span>
+            </li>
+        </ul>
+
+        <section id="legalState" class="panel hidden" aria-live="polite">
+            <header class="panel__title">Signals triggered</header>
+            <p class="lead">This page looks like a Terms or Privacy notice. Ready for a capture?</p>
+            <div class="panel__details">
+                <p class="panel__label">Why we paused here</p>
+                <ul id="detectionReasons"></ul>
+            </div>
+            <div class="actions">
+                <button id="consentYes" class="btn btn--primary">Start capture</button>
+                <button id="consentNo" class="btn">Ignore</button>
+            </div>
+        </section>
+
+        <section id="neutralState" class="panel hidden" aria-live="polite">
+            <header class="panel__title">Idle mode</header>
+            <p class="lead">No legal text detected yet.</p>
+            <p class="muted">Open a Terms of Service or Privacy Policy page to activate monitoring.</p>
+        </section>
+
+        <section id="acceptedState" class="panel hidden" aria-live="polite">
+            <header class="panel__title">Capture status</header>
+            <p class="lead" id="extractionHeadline"></p>
+            <p class="muted" id="extractionSubhead"></p>
+        </section>
+
+        <section id="analysisState" class="panel hidden" aria-live="polite">
+            <header class="panel__title">AI insights</header>
+            <p class="lead" id="analysisHeadline"></p>
+            <p class="muted" id="analysisSubhead"></p>
+            <div class="analysisViews hidden" id="analysisContent">
+                <button id="analysisBackButton" class="chipButton hidden" type="button">Back</button>
+                <div class="analysisView" id="analysisMeterView" aria-live="polite">
+                    <div id="analysisMeterInteractive" class="riskMeter" role="button" tabindex="0" aria-label="View category breakdown">
+                        <div class="riskMeter__dial">
+                            <svg viewBox="0 0 200 110" class="riskMeter__svg" aria-hidden="true" focusable="false">
+                                <defs>
+                                    <linearGradient id="riskMeterGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%" stop-color="#3af9b2" />
+                                        <stop offset="55%" stop-color="#ffc15a" />
+                                        <stop offset="100%" stop-color="#ff5d8f" />
+                                    </linearGradient>
+                                </defs>
+                                <path d="M15 100 A85 85 0 0 1 185 100" class="riskMeter__track" />
+                                <path d="M25 100 A75 75 0 0 1 175 100" class="riskMeter__arc" />
+                            </svg>
+                            <div class="riskMeter__ticks" aria-hidden="true">
+                                <span class="riskMeter__tick"></span>
+                                <span class="riskMeter__tick"></span>
+                                <span class="riskMeter__tick"></span>
+                                <span class="riskMeter__tick"></span>
+                            </div>
+                            <div class="riskMeter__needle" id="riskMeterNeedle">
+                                <span class="riskMeter__needleBody"></span>
+                                <span class="riskMeter__needleCap"></span>
+                            </div>
                         </div>
-                        <div class="riskMeter__needle" id="riskMeterNeedle">
-                            <span class="riskMeter__needleBody"></span>
-                            <span class="riskMeter__needleCap"></span>
+                        <div class="riskMeter__value">
+                            <span class="riskMeter__score" id="riskMeterScore">--</span>
+                            <span class="riskMeter__label" id="riskMeterLabel">Awaiting</span>
                         </div>
                     </div>
-                    <div class="riskMeter__value">
-                        <span class="riskMeter__score" id="riskMeterScore">--</span>
-                        <span class="riskMeter__label" id="riskMeterLabel">Awaiting</span>
+                    <div class="riskMeter__footer">
+                        <p class="riskMeter__hint" id="riskMeterHint">Tap the dial to explore category scores.</p>
+                        <button id="analysisSummaryButton" class="linkButton" type="button">Summary</button>
                     </div>
                 </div>
-                <div class="riskMeter__footer">
-                    <p class="riskMeter__hint" id="riskMeterHint">Tap the dial to explore category scores.</p>
-                    <button id="analysisSummaryButton" class="linkButton" type="button">Summary</button>
+                <div class="analysisView hidden" id="analysisBreakdownView" aria-live="polite">
+                    <p class="panel__label">Category breakdown</p>
+                    <div class="categoryGrid" id="analysisBreakdownGrid" aria-label="Category scores"></div>
+                    <div class="categoryDetail hidden" id="categoryDetail" role="dialog" aria-label="Category details" aria-modal="true" aria-hidden="true">
+                        <button id="categoryDetailBack" class="chipButton categoryDetail__back" type="button">Back</button>
+                        <article class="categoryDetail__card" id="categoryDetailCard">
+                            <p class="categoryDetail__label" id="categoryDetailLabel"></p>
+                            <p class="categoryDetail__score" id="categoryDetailScore">--</p>
+                            <p class="categoryDetail__tag" id="categoryDetailTag"></p>
+                            <p class="categoryDetail__text" id="categoryDetailText"></p>
+                        </article>
+                    </div>
+                </div>
+                <div class="analysisView hidden" id="analysisSummaryView" aria-live="polite">
+                    <p class="panel__label">Summary</p>
+                    <div class="analysisSummary" id="analysisSummary"></div>
+                    <p class="summaryDisclaimer">Information only. Not legal advice.</p>
                 </div>
             </div>
-            <div class="analysisView hidden" id="analysisBreakdownView" aria-live="polite">
-                <p class="panel__label">Category breakdown</p>
-                <div class="categoryGrid" id="analysisBreakdownGrid" aria-label="Category scores"></div>
-                <div class="categoryDetail hidden" id="categoryDetail" role="dialog" aria-label="Category details" aria-modal="true" aria-hidden="true">
-                    <button id="categoryDetailBack" class="chipButton categoryDetail__back" type="button">Back</button>
-                    <article class="categoryDetail__card" id="categoryDetailCard">
-                        <p class="categoryDetail__label" id="categoryDetailLabel"></p>
-                        <p class="categoryDetail__score" id="categoryDetailScore">--</p>
-                        <p class="categoryDetail__tag" id="categoryDetailTag"></p>
-                        <p class="categoryDetail__text" id="categoryDetailText"></p>
-                    </article>
-                </div>
-            </div>
-            <div class="analysisView hidden" id="analysisSummaryView" aria-live="polite">
-                <p class="panel__label">Summary</p>
-                <div class="analysisSummary" id="analysisSummary"></div>
-                <p class="summaryDisclaimer">Information only. Not legal advice.</p>
-            </div>
-        </div>
-    </section>
+        </section>
 
-    <section id="declinedState" class="panel hidden" aria-live="polite">
-        <header class="panel__title">Monitoring paused</header>
-        <p class="lead" id="consentMessage"></p>
-        <p class="muted">We’ll remember this until you reopen the popup.</p>
-    </section>
+        <section id="declinedState" class="panel hidden" aria-live="polite">
+            <header class="panel__title">Monitoring paused</header>
+            <p class="lead" id="consentMessage"></p>
+            <p class="muted">We’ll remember this until you reopen the popup.</p>
+        </section>
+    </div>
 </div>
 <script src="popup.js"></script>
 </body>

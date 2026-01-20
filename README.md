@@ -12,14 +12,15 @@ ClearTerms helps surface Terms of Service and Privacy Policy pages the moment yo
 1. Clone or download this repository.
 2. Open `chrome://extensions/` in Chrome and enable **Developer mode**.
 3. Click **Load unpacked** and select this project folder (the one containing `manifest.json`).
-4. Create a `config.json` file (see below) that stores your Gemini API key.
+4. Click the ClearTerms toolbar icon and, on first run, paste your Gemini API key into the popup when prompted.
 5. Open the popup on any site and navigate to a Terms/Privacy page. The popup will show the detection state, capture progress, and Gemini analysis once ready.
 
 ## Configure Gemini API access
 
-1. Copy `config.example.json` to `config.json` in the project root.
-2. Replace `YOUR_API_KEY_HERE` with a valid Gemini API key (kept private—`config.json` is ignored by git).
-3. Reload the extension in `chrome://extensions/` whenever you change the key so the background worker reads the updated config.
+1. Load the extension and click the ClearTerms icon to open the popup.
+2. Enter your Gemini API key in the "API key required" screen and click **Save key**.
+3. The key is stored only in `chrome.storage.local`; it never touches this repository or a remote server.
+4. Use the **Reset API key** link in the popup at any time to delete the saved key and switch accounts.
 
 ## Development Notes
 

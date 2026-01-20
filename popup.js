@@ -14,6 +14,10 @@ let expandedCategoryKey = null
 let expandedCategoryElement = null
 let categoryDetailAnimating = false
 let detectionScriptInjectionPending = false
+let hasGeminiApiKey = false
+let apiKeySavePending = false
+let forceResetButtonVisible = false
+let pendingTabStateReset = false
 
 const detectionBadge = document.getElementById("detectionBadge")
 const legalState = document.getElementById("legalState")
@@ -50,6 +54,15 @@ const riskMeterScore = document.getElementById("riskMeterScore")
 const riskMeterLabel = document.getElementById("riskMeterLabel")
 const riskMeterHint = document.getElementById("riskMeterHint")
 const processingTrackItems = Array.from(document.querySelectorAll('.stateTrack li'))
+const apiKeyState = document.getElementById("apiKeyState")
+const extensionContent = document.getElementById("extensionContent")
+const apiKeyForm = document.getElementById("apiKeyForm")
+const apiKeyInput = document.getElementById("apiKeyInput")
+const apiKeyMessage = document.getElementById("apiKeyMessage")
+const apiKeyHelpLink = document.getElementById("apiKeyHelpLink")
+const apiKeyControls = document.getElementById("apiKeyControls")
+const apiKeyResetButton = document.getElementById("apiKeyResetButton")
+const apiKeySaveButton = document.getElementById("apiKeySaveButton")
 
 const SCORE_LABELS = {
     overall: "Overall risk",
@@ -67,6 +80,7 @@ const SCORE_BANDS = [
     {min: 20, level: 2, label: "Low Risk"},
     {min: 0, level: 1, label: "Safe"},
 ]
+const GEMINI_HELP_URL = "https://ai.google.dev/gemini-api/docs/api-key"
 
 consentYes.addEventListener("click", () => submitConsent("accepted"))
 consentNo.addEventListener("click", () => submitConsent("declined"))
@@ -99,19 +113,80 @@ document.addEventListener("keydown", (event) => {
         collapseCategoryDetail()
     }
 })
+apiKeyForm?.addEventListener("submit", handleApiKeySave)
+apiKeyInput?.addEventListener("input", () => setApiKeyMessage(""))
+apiKeyHelpLink?.addEventListener("click", openGeminiHelp)
+apiKeyResetButton?.addEventListener("click", handleApiKeyReset)
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === "local" && Object.prototype.hasOwnProperty.call(changes, "geminiApiKey")) {
+        const nextValue = typeof changes.geminiApiKey.newValue === "string" ? changes.geminiApiKey.newValue.trim() : ""
+        applyApiKeyAvailability(Boolean(nextValue))
+        if (nextValue) {
+            const shouldReset = pendingTabStateReset
+            pendingTabStateReset = false
+            initializeActiveTabContext({resetState: shouldReset})
+        } else {
+            pendingTabStateReset = false
+        }
+    }
+    if (areaName === "local" && Object.prototype.hasOwnProperty.call(changes, "geminiApiKeyStatus")) {
+        const change = changes.geminiApiKeyStatus
+        const statusText = typeof change.newValue === "string" ? change.newValue : ""
+        if (statusText) {
+            setApiKeyMessage(statusText, "error")
+        } else if (change.newValue === undefined) {
+            setApiKeyMessage("")
+        }
+    }
+})
 
 document.addEventListener("DOMContentLoaded", () => {
+    initializePopup()
+})
+
+function initializePopup() {
+    readStoredApiKeyState().then(({hasKey, statusMessage}) => {
+        if (statusMessage) {
+            setApiKeyMessage(statusMessage, "error")
+        }
+        applyApiKeyAvailability(hasKey)
+        if (hasKey) {
+            initializeActiveTabContext()
+        } else {
+            renderState(null)
+        }
+    })
+}
+
+function initializeActiveTabContext(options = {}) {
+    if (!hasGeminiApiKey) {
+        return
+    }
     chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
         if (!tabs || tabs.length === 0) {
             renderState(null)
             return
         }
         activeTabId = tabs[0].id ?? null
-        fetchDetectionState()
+        if (typeof activeTabId !== "number") {
+            renderState(null)
+            return
+        }
+        const shouldReset = Boolean(options.resetState)
+        const afterReset = () => fetchDetectionState()
+        if (shouldReset) {
+            requestTabStateReset(activeTabId).then(afterReset)
+        } else {
+            afterReset()
+        }
     })
-})
+}
 
 function fetchDetectionState() {
+    if (!hasGeminiApiKey) {
+        return
+    }
     if (typeof activeTabId !== "number") {
         renderState(null)
         maybeRequestDetectionRefresh(null)
@@ -741,6 +816,10 @@ function scrollAnalysisViewIntoFocus(element) {
 }
 
 function maybeRequestAnalysis(state) {
+    if (!hasGeminiApiKey) {
+        analysisKickoffRequested = false
+        return
+    }
     if (state.consent !== "accepted") {
         analysisKickoffRequested = false
         return
@@ -760,6 +839,9 @@ function maybeRequestAnalysis(state) {
 }
 
 function requestGeminiAnalysis() {
+    if (!hasGeminiApiKey) {
+        return
+    }
     if (typeof activeTabId !== "number") {
         return
     }
@@ -797,6 +879,9 @@ function syncPolling(state) {
 }
 
 function maybeRequestDetectionRefresh(state) {
+    if (!hasGeminiApiKey) {
+        return
+    }
     if (typeof activeTabId !== "number") {
         return
     }
@@ -810,6 +895,9 @@ function maybeRequestDetectionRefresh(state) {
 }
 
 function requestDetectionRefresh() {
+    if (!hasGeminiApiKey) {
+        return
+    }
     if (detectionRefreshPending) {
         return
     }
@@ -836,9 +924,155 @@ function requestDetectionRefresh() {
 }
 
 function requestStateRefreshSoon() {
+    if (!hasGeminiApiKey) {
+        return
+    }
     setTimeout(() => {
         if (!pollingHandle) {
             fetchDetectionState()
         }
     }, 200)
+}
+
+function readStoredApiKeyState() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(["geminiApiKey", "geminiApiKeyStatus"], (items) => {
+            if (chrome.runtime.lastError) {
+                console.warn("Unable to read stored API key", chrome.runtime.lastError)
+                resolve({hasKey: false, statusMessage: ""})
+                return
+            }
+            const key = typeof items?.geminiApiKey === "string" ? items.geminiApiKey.trim() : ""
+            const statusMessage = typeof items?.geminiApiKeyStatus === "string" ? items.geminiApiKeyStatus : ""
+            resolve({hasKey: Boolean(key), statusMessage})
+        })
+    })
+}
+
+function applyApiKeyAvailability(enabled) {
+    hasGeminiApiKey = enabled
+    extensionContent?.classList.toggle("hidden", !enabled)
+    apiKeyState?.classList.toggle("hidden", enabled)
+    if (enabled) {
+        forceResetButtonVisible = false
+        apiKeyInput && (apiKeyInput.value = "")
+        setApiKeyMessage("")
+    } else {
+        stopStatePolling()
+        detectionRefreshPending = false
+        detectionScriptInjectionPending = false
+        analysisKickoffRequested = false
+        activeTabId = null
+        renderState(null)
+    }
+    syncResetButtonVisibility()
+}
+
+function handleApiKeySave(event) {
+    event?.preventDefault()
+    if (apiKeySavePending) {
+        return
+    }
+    if (!apiKeyInput) {
+        return
+    }
+    const key = apiKeyInput.value.trim()
+    if (!key) {
+        setApiKeyMessage("Enter a Gemini API key to continue.", "error")
+        return
+    }
+    if (key.length < 30) {
+        setApiKeyMessage("The key looks too short. Paste the full Gemini API key.", "error")
+        return
+    }
+    apiKeySavePending = true
+    if (apiKeySaveButton) {
+        apiKeySaveButton.disabled = true
+    }
+    chrome.storage.local.set({geminiApiKey: key}, () => {
+        apiKeySavePending = false
+        if (apiKeySaveButton) {
+            apiKeySaveButton.disabled = false
+        }
+        if (chrome.runtime.lastError) {
+            setApiKeyMessage("Unable to save the API key. Try again.", "error")
+            return
+        }
+        chrome.storage.local.remove("geminiApiKeyStatus", () => {})
+        apiKeyInput.value = ""
+        setApiKeyMessage("Key saved. You can close this popup.", "success")
+        forceResetButtonVisible = false
+        setResetButtonHighlight(false)
+        syncResetButtonVisibility()
+        pendingTabStateReset = true
+    })
+}
+
+function handleApiKeyReset() {
+    chrome.storage.local.remove(["geminiApiKey", "geminiApiKeyStatus"], () => {
+        if (chrome.runtime.lastError) {
+            setApiKeyMessage("Unable to reset the API key. Try again.", "error")
+            return
+        }
+        setApiKeyMessage("API key cleared. Enter a new key to re-enable AI analysis.", "success")
+        pendingTabStateReset = true
+        if (typeof activeTabId === "number") {
+            requestTabStateReset(activeTabId)
+        } else {
+            renderState(null)
+        }
+    })
+}
+
+function openGeminiHelp(event) {
+    event?.preventDefault()
+    chrome.tabs.create({url: GEMINI_HELP_URL}, () => chrome.runtime.lastError && console.debug(chrome.runtime.lastError))
+}
+
+function setApiKeyMessage(text, variant = "") {
+    if (!apiKeyMessage) {
+        return
+    }
+    apiKeyMessage.textContent = text
+    apiKeyMessage.classList.toggle("hidden", !text)
+    apiKeyMessage.classList.remove("formMessage--error", "formMessage--success")
+    if (variant === "error") {
+        apiKeyMessage.classList.add("formMessage--error")
+    } else if (variant === "success") {
+        apiKeyMessage.classList.add("formMessage--success")
+    }
+    const highlightReset = Boolean(text && /reset the api key/i.test(text))
+    forceResetButtonVisible = highlightReset
+    setResetButtonHighlight(highlightReset)
+    syncResetButtonVisibility()
+}
+
+function stopStatePolling() {
+    if (pollingHandle) {
+        clearTimeout(pollingHandle)
+        pollingHandle = null
+    }
+}
+
+function syncResetButtonVisibility() {
+    if (!apiKeyControls) {
+        return
+    }
+    const shouldShow = hasGeminiApiKey || forceResetButtonVisible
+    apiKeyControls.classList.toggle("hidden", !shouldShow)
+}
+
+function setResetButtonHighlight(enabled) {
+    apiKeyResetButton?.classList.toggle("is-highlighted", Boolean(enabled))
+}
+
+function requestTabStateReset(tabId) {
+    return new Promise((resolve) => {
+        chrome.runtime.sendMessage({type: "RESET_TAB_STATE", tabId}, () => {
+            if (chrome.runtime.lastError) {
+                console.debug("Unable to reset tab state", chrome.runtime.lastError)
+            }
+            resolve()
+        })
+    })
 }
