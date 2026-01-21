@@ -27,3 +27,8 @@ ClearTerms helps surface Terms of Service and Privacy Policy pages the moment yo
 - `content.js` performs lightweight DOM scans and sends detection messages to the background script.
 - `background.js` now owns extraction state plus the Gemini request lifecycle (including JSON validation and error handling).
 - `popup.js` requests the detection state for the active tab and renders detection, extraction, and AI analysis states in one place.
+
+### Example ClearTerms AI Outputs
+
+<img height="300" alt="image" src="https://github.com/user-attachments/assets/56c64f74-f625-4c83-9ad7-6e16c07c5bab" /> <img height="300" alt="image" src="https://github.com/user-attachments/assets/e2d61f85-3f6e-46b2-a128-368d0bd2d69c" />
+
