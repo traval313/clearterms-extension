@@ -408,6 +408,8 @@ When justifying scores, consider whether data practices align with reasonable ex
 - Quote the clause
 - Assign the level based on the clause rubric (DO NOT adjust the score)
 - Note: "This practice [aligns / does not align] with reasonable expectations for a [product type]"
+- Provide 2-3 concise sentences per category explaining the trigger, assigned level, and alignment callout.
+- Keep the entire justification under 320 characters and avoid extra commentary.
 
 
   # OUTPUT FORMAT (STRICT JSON)
