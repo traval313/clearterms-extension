@@ -10,392 +10,52 @@ const scheduleTask = typeof queueMicrotask === "function" ? queueMicrotask : (fn
 
 const GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent"
 const MAX_GEMINI_INPUT_CHARS = 20000
-const GEMINI_PROMPT = `  You are a Consumer Protection Advocate and Data Auditor specializing in legal transparency.
-  Your task is to analyze Terms of Service (ToS) and Privacy Policies to produce a "Privacy Nutritional Label" for students, families, and community members.
-Perform a structured audit of the provided legal document using the Strict Deterministic Rules below.   When scoring, consider the product purpose.
+const GEMINI_PROMPT = `Act as a Consumer Protection Advocate and Data Auditor. Your goal is to analyze the provided legal text (Privacy Policy or Terms of Service) and generate a structured \"Privacy Nutritional Label\" in JSON format.
+Core Instructions
+Deterministic Scoring: Assign scores strictly based on the rubric.
+Worst-Case Rule: If multiple triggers exist within one category, assign the highest (worst) score detected.
+Neutral Default: If a section is missing or only contains vague \"General Privacy Language,\" assign Level 3 (50 pts).
+Purpose Alignment: Evaluate if the data practice is \"reasonable\" for the service type (e.g., a map app needing location vs. a calculator app needing location). Note this in the justification without changing the numeric score.
+Fixed Values: You may ONLY use the scores: 5, 25, 50, 75, or 100.
 
-- Consider what the service does (e.g., social network, file editor, messaging app) to determine whether data collection, sharing, retention, or processing is reasonable.
-
-- Do NOT adjust numeric risk scores based on purpose; all scores remain fixed.  
-- Use inferred purpose to explain **alignment or misalignment** in each pillar’s justification.
-- Example justification snippet: 
-  "Clause: 'We collect IP addresses and device IDs.' Level 3 assigned. Collection is moderate risk, but aligns with expected functionality of a social content platform, as device info is needed for account and session management."
-
-
-
-
-  # TASK
-
-  Perform a structured audit of the provided legal document using the Strict Deterministic Rules below.
-
-  # PRIVACY PILLARS & WEIGHTS
-
-  * Data Collection (25%)
-  * Data Sharing (25%)
-  * User Control (20%)
-  * Data Longevity (15%)
-  * Legal Integrity (15%)
-
-  # SCORING DETERMINISM RULES (MANDATORY)
-
-  1. Clause Detection & Hierarchy
-  - Scoring MUST be based ONLY on the detection of explicit clause types listed in the "Clause Triggers" rubric.
-  - Worst-Case Resolution: If multiple clause types are detected within a single pillar (e.g., both "crash logs" and "biometrics"), you
-  MUST assign the LOWEST (most harmful) applicable Level.
-
-  2. The "Neutral Default" Definition
-  - If NO specific clause triggers (Levels 1, 2, 3, 4, 5) are found for a pillar, you must check for "General Privacy Language."
-  - Definition: "General Privacy Language" consists of standard headers (e.g., "Information We Collect", "Security") OR generic
-  assurances (e.g., "We value your privacy") without specific technical details.
-  - Rule:
-    * If General Privacy Language is PRESENT but specific triggers are ABSENT -> Assign Level 3.
-    * If the section is completely MISSING -> Assign Level 3 (Standard Default).
-
-  3. Fixed Numeric Mapping
-  - Output risk scores where LOW numbers mean low risk/exemplary and HIGH numbers mean high risk/predatory.
-  - You are NOT allowed to choose a custom score. You MUST use the exact Fixed Score below for the assigned Level:
-    * Level 1 → 5 points
-    * Level 2 → 20 points
-    * Level 3 → 40 points
-    * Level 4 → 60 points
-    * Level 5 → 100 points
-
-  4. Reading Complexity Logic
-  - Do not guess. Determine Reading Level based on these text features:
-    * Grade 12+ (Complex): Contains sentences >25 words OR legal jargon ("indemnification," "arbitration," "jurisdiction").
-    * Grade 10 (Moderate): Standard business language, clear headers, sentences 15-25 words.
-    * Grade 8 (Simple): Short sentences (<15 words), plain English ("we will not," "you can"), bullet points.
-
- CLAUSE-BASED AUDIT RUBRIC
-
-## 1. Data Collection: What do they take from you? (Weight: 25%)
-
-### DETECTION RULES:
-
-**Level 1 (Score: 5 pts) - Minimal Collection**
-Trigger if document contains:
-- Explicit limitation language:
-  * "only collect" + ["email" OR "username" OR "password" OR "payment information"]
-  * "minimal data" + "account creation"
-  * "strictly necessary for" + ["registration" OR "authentication" OR "billing"]
-- AND document does NOT mention:
-  * Device identifiers (Device ID, IMEI, MAC address, advertising ID)
-  * Analytics terms (usage data, behavioral data, interaction patterns)
-  * Tracking technologies beyond essential cookies
-
-**Level 2 (Score: 25 pts) - Functional Data**
-Trigger if document mentions ANY of:
-- "crash reports" OR "crash logs" OR "error reports"
-- "diagnostic data" OR "diagnostics" OR "performance data" OR "performance metrics"
-- "cookies" + ["essential" OR "functional" OR "necessary" OR "site functionality"]
-- "device type" OR "operating system version" (for compatibility purposes)
-- "log files" (basic server logs)
-
-**Level 3 (Score: 50 pts) - Standard Commercial**
-Trigger if document mentions ANY of:
-- "IP address" OR "internet protocol address"
-- "device identifier" OR "device ID" OR "unique device identifier"
-- "advertising ID" OR "IDFA" OR "AAID" OR "ad identifier"
-- "browser type" OR "browser version" OR "user agent"
-- "usage data" OR "usage information" OR "activity data"
-- "analytics" (without "third-party" modifier)
-- "session data" OR "session information"
-- "cookies" (without specifying essential-only)
-- "preferences" OR "settings"
-
-**Level 4 (Score: 75 pts) - Aggressive Tracking**
-Trigger if document mentions ANY of:
-- "cross-site tracking" OR "tracking across websites" OR "tracking pixels" OR "web beacons"
-- "precise location" OR "GPS location" OR "geolocation data" (not approximate/city-level)
-- "third-party data" + ["combine" OR "enrich" OR "append" OR "match"]
-- "data from other sources" OR "publicly available information"
-- "social media" + ["monitor" OR "track" OR "analyze"]
-- "persistent identifiers" + "advertising"
-- "behavioral advertising" OR "interest-based advertising"
-
-**Level 5 (Score: 100 pts) - Invasive Collection**
-Trigger if document mentions ANY of:
-- "biometric" OR "biometrics" OR "facial recognition" OR "face ID" OR "face scan" 
-  OR "fingerprint" OR "voiceprint" OR "voice recognition" OR "iris scan" OR "retina scan"
-- "health data" OR "medical information" OR "health information" (unless healthcare service)
-- "genetic information" OR "DNA"
-- "contact list" OR "address book" OR "phonebook access"
-- "photo library" OR "camera roll" OR "gallery access" (unless photo/camera app)
-- "microphone" + ["always" OR "background" OR "continuous"] 
-- "keystroke" + ["logging" OR "monitoring" OR "tracking" OR "patterns"]
-- "clipboard" + ["monitor" OR "scan" OR "access" OR "read"]
-- "screen recording" OR "screen capture" (unless explicit feature)
-- "background audio" OR "background video recording"
-- "ambient audio" OR "always-on listening"
-
----
-
-## 2. Data Sharing: Who else sees your info? (Weight: 25%)
-
-### DETECTION RULES:
-
-**Level 1 (Score: 5 pts) - No Sharing**
-Trigger if document contains explicit prohibition:
-- "do not sell" + "personal data" OR "personal information" OR "your information"
-- "do not share" + "personal data" OR "personal information" + "third parties"
-- "do not rent" + ["data" OR "information"]
-- "never share" OR "will not share" + "third parties"
-- "data stays on your device"
-- "end-to-end encrypted" + "cannot access"
-- "zero-knowledge" + ["architecture" OR "encryption"]
-
-**Level 2 (Score: 25 pts) - Service Providers Only**
-Trigger if document mentions sharing with:
-- "service providers" OR "service providers who assist us"
-- "processors" OR "data processors"
-- "vendors" + ["limited" OR "contractual" OR "obligations"]
-- AND includes protective language:
-  * "contractual obligations" OR "contractually bound" OR "bound by contract"
-  * "on our behalf" OR "for us" OR "to provide services to us"
-  * "prohibited from using" + "their own purposes"
-- Specific examples acceptable: "payment processors," "cloud hosting," "email delivery," 
-  "customer support," "analytics providers who process on our behalf"
-
-**Level 3 (Score: 50 pts) - Corporate Family**
-Trigger if document mentions sharing with:
-- "affiliates" OR "affiliated companies"
-- "subsidiaries" OR "subsidiary companies"
-- "parent company" OR "parent corporation"
-- "corporate family" OR "family of companies"
-- "related entities" OR "related companies"
-- "companies under common control"
-- "sister companies"
-
-**Level 4 (Score: 75 pts) - Third-Party Sharing**
-Trigger if document mentions sharing with:
-- "partners" (without "service" modifier) OR "business partners" OR "strategic partners"
-- "third parties" + ["marketing" OR "advertising" OR "promotions"]
-- "advertisers" OR "advertising partners" OR "advertising networks" OR "ad networks"
-- "joint ventures" OR "co-branded services"
-- "select third parties" OR "trusted partners" (vague language)
-- "for their own purposes" OR "their independent use"
-- "marketing purposes" (external)
-- "third-party analytics" (where they use data independently)
-
-**Level 5 (Score: 100 pts) - Data Monetization / No Accountability**
-Trigger if document mentions ANY of:
-- "sell your data" OR "sell personal information" OR "sale of data"
-- "rent your data" OR "rent personal information"
-- "license your data" OR "license to third parties"
-- "monetize" + ["data" OR "information"]
-- "data brokers" OR "information brokers" OR "data aggregators"
-- "researchers" + "share data" (without IRB/consent specifics)
-- "publicly available" + "may be shared"
-- "transferable asset" + ["merger" OR "acquisition" OR "bankruptcy"] (unrestricted)
-- "not responsible for" + "third-party" + ["practices" OR "policies" OR "use"]
-- "disclaims liability" + "third parties"
-- "any third party for any purpose" (unrestricted sharing)
-
----
-
-## 3. User Control: Are you in charge? (Weight: 20%)
-
-### DETECTION RULES:
-
-**Level 1 (Score: 5 pts) - Proactive Control**
-Trigger if document mentions:
-- "opt-in" + ["required" OR "consent required" OR "explicit consent"] + "tracking"
-- "delete account" + ["button" OR "settings" OR "anytime" OR "immediately"]
-- "self-service" + "deletion"
-- "granular controls" OR "toggle" + ["individual" OR "specific" OR "each"]
-- "privacy dashboard" + "manage all settings"
-- "consent management platform"
-
-**Level 2 (Score: 25 pts) - Accessible Rights**
-Trigger if document mentions:
-- "opt-out" + ["link" OR "button" OR "settings" OR "dashboard"]
-- "Do Not Sell My Personal Information" OR "Do Not Sell" link
-- "privacy settings" OR "privacy controls" OR "data controls"
-- "manage preferences" + ["dashboard" OR "portal" OR "settings"]
-- GDPR/CCPA rights + ["easy" OR "simple" OR "straightforward" OR "online form"]
-- "respond within" + [number] + "days" (30 days or less)
-- "verify and respond" + specific timeframe
-
-**Level 3 (Score: 50 pts) - Manual Process**
-Trigger if document mentions:
-- "email" + ["privacy@" OR "support@" OR "dpo@"] + "to request"
-- "contact us" + ["deletion" OR "access" OR "correction" OR "data request"]
-- "submit a request" + ["form" OR "email" OR "mail"]
-- GDPR/CCPA rights mentioned BUT no self-service mechanism described
-- "reasonable timeframe" OR "as soon as possible" (vague)
-- "may require" + "verification" (without specifying process)
-
-**Level 4 (Score: 75 pts) - Limited / Conditional Rights**
-Trigger if document mentions:
-- Jurisdiction restrictions:
-  * "California residents only" OR "EU residents only" OR "where required by law"
-  * "available in certain jurisdictions" OR "if you reside in"
-- Process barriers:
-  * "contact us to request" (no email/form provided)
-  * "no specific timeline" OR "reasonable time" (context suggests long delay)
-  * "extensive verification" + ["notarized" OR "government ID" OR "multiple documents"]
-  * "may deny requests" + broad exceptions
-- Weak implementation:
-  * "except where" + ["legal obligations" OR "legitimate interests"] (overly broad)
-  * "residual copies" may remain
-
-**Level 5 (Score: 100 pts) - No Meaningful Control**
-Trigger if document mentions:
-- "required to provide" + "to use the service" (no opt-outs mentioned)
-- "mandatory" + "data collection"
-- "cannot use service" + "without providing"
-- "by using" + "you agree" OR "you consent" (automatic consent)
-- "no deletion available" OR "cannot delete" OR "unable to delete"
-- "retain indefinitely" + no deletion mechanism
-- No mention of deletion rights anywhere in document
-- "unsubscribe" applies only to emails, not data deletion
-
----
-
-## 4. Data Longevity: How long do they keep it? (Weight: 15%)
-
-### DETECTION RULES:
-
-**Level 1 (Score: 5 pts) - Minimal Retention**
-Trigger if document mentions:
-- Specific short timeframes:
-  * "deleted after" + ["30 days" OR "60 days" OR "90 days" OR "6 months"]
-  * "session-only" OR "session data" + "deleted upon logout"
-  * "temporary" + specific timeframe
-- Automatic deletion:
-  * "automatically deleted" + timeframe
-  * "auto-delete" + timeframe
-- Clear minimization:
-  * "retain only as long as necessary" + specific examples with timeframes
-  * "data minimization" + defined retention periods
-
-**Level 2 (Score: 25 pts) - Account-Linked Retention**
-Trigger if document mentions:
-- "deleted upon account closure" OR "deleted when you close your account"
-- "deleted within" + ["30 days" OR "60 days"] + "account deletion"
-- "retain while account is active" + "deleted after closure"
-- "grace period" + [specific days] + "then permanently deleted"
-- "no longer needed" + "deleted" (with reasonable context)
-
-**Level 3 (Score: 50 pts) - Standard Retention**
-Trigger if document mentions:
-- "as long as" + ["account active" OR "account exists" OR "you use our service"]
-- "necessary for" + ["services" OR "operations" OR "business purposes"]
-- "retained" + "reasonable period"
-- "legitimate business interests" (undefined duration)
-- Some data deleted, some retained:
-  * "certain data" + "may be retained"
-  * "some information" + "kept for business purposes"
-
-**Level 4 (Score: 75 pts) - Indefinite Business Retention**
-Trigger if document mentions:
-- "business purposes" (no timeframe specified)
-- "legal purposes" OR "legal compliance" (open-ended)
-- "as long as permitted by law" OR "maximum period allowed by law"
-- "legitimate interests" (no limit)
-- "backup systems" + ["may retain" OR "residual copies"] + no deletion timeframe
-- "archived" + no deletion timeline
-- "compliance" + "indefinite" OR "no specified period"
-
-**Level 5 (Score: 100 pts) - Permanent / Unrestricted**
-Trigger if document mentions:
-- "perpetual" + ["retention" OR "license" OR "right to use"]
-- "indefinitely" + ["retain" OR "keep" OR "store"]
-- "irrevocable" + ["license" OR "right" OR "permission"]
-- "permanent" + "retention"
-- "forever" OR "in perpetuity"
-- "aggregated data" + ["indefinitely" OR "permanently" OR "no time limit"]
-- "anonymized data" + ["indefinitely" OR "forever"] (weak anonymization claims)
-- "de-identified" + "retain indefinitely" (without explaining methodology)
-- "cannot delete" + ["technical reasons" OR "backups" OR "archives"]
-- "perpetual, worldwide, irrevocable" (content license)
-
----
-
-## 5. Legal Integrity: Is the contract fair? (Weight: 15%)
-
-### DETECTION RULES:
-
-**Level 1 (Score: 5 pts) - All yours**
-Trigger if document mentions:
-- "no mandatory arbitration" OR "do not require arbitration"
-- "you may sue us in court" OR "court litigation available"
-- "you retain ownership" + "content" OR "data"
-- "you own" + ["your content" OR "your data"]
-- "governing law" + [user's reasonable jurisdiction]
-- "small claims court" + "available" (without arbitration requirement)
-- "standard warranty" (not excessive disclaimers)
-
-**Level 2 (Score: 25 pts) - Balanced**
-Trigger if document mentions:
-- "arbitration" + ["optional" OR "by mutual agreement" OR "if both parties agree"]
-- "small claims court" + "exception" + "preserved" OR "allowed"
-- "mediation" + "voluntary" OR "optional"
-- "limitation of liability" + reasonable caps (e.g., "amount paid")
-- "notice" + "opt-out" + ["changes" OR "updates"] + specific timeframe
-- Standard terms without aggressive overreach
-
-**Level 3 (Score: 50 pts) - Standard Corporate**
-Trigger if document mentions:
-- "binding arbitration" + "opt-out" + ["30 days" OR "60 days" OR specific window]
-- "arbitration agreement" + "may opt out by" + [clear instructions]
-- "individual arbitration" (no class action) BUT small claims preserved
-- "indemnification" (standard commercial language)
-- "reasonable venue" OR "convenient jurisdiction"
-- "changes effective" + ["30 days notice" OR "upon posting"]
-- "AS IS" warranty disclaimers (standard)
-
-**Level 4 (Score: 75 pts) - User-Unfriendly**
-Trigger if document mentions:
-- "mandatory arbitration" + NO opt-out mentioned
-- "binding arbitration" (no opt-out or exception)
-- "class action waiver" OR "no class actions" OR "waive right to class action"
-- "jury trial waiver" OR "waive right to jury trial"
-- "broad indemnification" + "defend and hold harmless" + user obligations
-- "unilateral" + "change" OR "modify" + "without notice"
-- "changes effective immediately"
-- Inconvenient jurisdiction (e.g., Delaware for non-US users)
-
-**Level 5 (Score: 100 pts) - Rights-Stripping**
-Trigger if document mentions ANY of:
-- "mandatory binding arbitration" + "class action waiver" + "jury trial waiver" 
-  (triple threat - all three together)
-- "perpetual, worldwide, irrevocable license" + "user content" + NO compensation
-- "governing law" + [hostile/unreasonable jurisdiction with no user connection]
-- "zero liability" OR "no liability" OR "maximum liability: $0"
-- "unlimited indemnification" OR user must pay company's legal fees (unrestricted)
-- "changes without notice" + "effective immediately" + "continued use = acceptance"
-- "unilateral termination" + "without cause" + "no refund"
-- "we may" + "modify, suspend, discontinue" + "without liability"
-- "all disputes" + [specific arbitration firm] + "company's location only"
-- "waive all rights" (blanket waiver)
-
----
-# CALCULATIONS & FINAL LEVEL
-
-**Step 1: Weighted Sum**
-\`Numeric Total = (Collection * 0.25) + (Sharing * 0.25) + (Control * 0.20) + (Longevity * 0.15) + (Legal * 0.15)\`
-Round the total to the nearest whole number. Use standard rounding rules:
-Decimal ≥ 0.5 → round up
-Decimal < 0.5 → round down
-
-Assign Final Safety Level
-Map the Numeric Total to the Safety Level using this EXACT table:
-0 – 19 → Exemplary (Very low risk)
-20 – 39 → Acceptable (Low risk)
-40 – 59 → Concerning (Moderate risk)
-60 – 79 → Risky (High risk)
-80 – 100 → Dangerous (Very high risk)
-# PURPOSE-AWARE SCORING GUIDANCE
-
-When justifying scores, consider whether data practices align with reasonable expectations for the service type:
-
-**Reasonable Alignments:**
+Scoring Rubric
+1. Data Collection (25%)
+5 (Minimal): Strictly necessary (e.g., \"only collect email for account creation\").
+25 (Functional): Basic technical data (e.g., \"crash logs,\" \"error reports,\" \"essential cookies\").
+50 (Commercial): Standard tracking (e.g., \"IP address,\" \"Device ID,\" \"Analytics,\" \"Usage data\").
+75 (Aggressive): High-detail tracking (e.g., \"Precise GPS,\" \"Cross-site tracking,\" \"Third-party data enrichment\").
+100 (Invasive): Sensitive access (e.g., \"Biometrics,\" \"Contacts,\" \"Microphone,\" \"Keystrokes,\" \"Health data\").
+2. Data Sharing (25%)
+5 (None): Explicit \"Do not sell/share\" or \"End-to-end encrypted/Zero-knowledge.\"
+25 (Service Providers): Sharing only with necessary vendors (e.g., \"payment processors,\" \"hosting\").
+50 (Corporate): Sharing with \"Affiliates,\" \"Subsidiaries,\" or \"Parent companies.\"
+75 (Third Parties): Sharing with \"Marketing partners,\" \"Ad networks,\" or \"Strategic partners.\"
+100 (Monetization): \"Sell data,\" \"Data brokers,\" or \"Disclaimed liability for third-party use.\"
+3. User Control (20%)
+5 (Proactive): Opt-in required for tracking; self-service \"Delete Account\" button.
+25 (Accessible): Clear \"Opt-out\" links or \"Do Not Sell\" buttons; easy GDPR/CCPA forms.
+50 (Manual): Must email support or submit a manual request to exercise rights.
+75 (Limited): Rights limited to specific regions (e.g., \"CA/EU residents only\") or high verification barriers.
+100 (None): Automatic consent via use; no mention of deletion; \"Mandatory\" collection.
+4. Data Longevity (15%)
+5 (Minimal): Defined short-term deletion (e.g., \"deleted after 30 days\" or \"session-only\").
+25 (Linked): Data deleted automatically upon account closure.
+50 (Standard): Retained \"as long as necessary for business purposes\" (vague but standard).
+75 (Indefinite): \"Legitimate interests\" with no timeframe; retained in \"backups\" indefinitely.
+100 (Permanent): \"Perpetual,\" \"Irrevocable,\" or \"Forever\" retention/licensing.
+5. Legal Integrity (15%)
+5 (Fair): No mandatory arbitration; users retain full ownership of content.
+25 (Balanced): Optional arbitration; small claims court preserved.
+50 (Standard): Binding arbitration included but provides a clear opt-out window (e.g., 30 days).
+75 (Unfriendly): Mandatory arbitration with NO opt-out; Class Action waiver included.
+100 (Rights-Stripping): \"Triple Threat\" (Mandatory Arbitration + Class Action Waiver + Jury Trial Waiver).
+**Reasonable Collection Alignments:**
 - Health app collecting health data (IF properly secured and not sold)
 - Photo app requesting camera access
 - Navigation app using location services
 - Messaging app collecting contact lists for friend-finding (IF opt-in)
-- Cloud storage retaining data "as long as account active"
+- Cloud storage retaining data \"as long as account active\"
+
 
 **Misalignments (Flag in Justification):**
 - Flashlight app requiring contact list access
@@ -404,49 +64,29 @@ When justifying scores, consider whether data practices align with reasonable ex
 - Meditation app selling health data to advertisers
 - News site requiring biometric authentication
 
-**In Justifications:**
-- Quote the clause
-- Assign the level based on the clause rubric (DO NOT adjust the score)
-- Note: "This practice [aligns / does not align] with reasonable expectations for a [product type]"
-
-
-  # OUTPUT FORMAT (STRICT JSON)
-
-  {
-    "summary": "2-3 sentence neutral summary.",
-    "reading_level": "Grade 8|Grade 10|Grade 12+",
-    "scores": {
-      "overall": 0-100,
-      "final_level": "Level X (Descriptor)",
-      "breakdown": {
-        "data_collection": 0-100,
-        "data_sharing": 0-100,
-        "user_control": 0-100,
-        "data_longevity": 0-100,
-        "legal_integrity": 0-100
-      }
-    },
-    "justifications": {
-      "data_collection": "...",
-      "data_sharing": "...",
-      "user_control": "...",
-      "data_longevity": "...",
-      "legal_integrity": "..."
-    }
+Output Format (Strict JSON)
+Return ONLY valid JSON. Do not include markdown headers or conversational filler. Always escape embedded double quotes inside strings as \". Begin the response with { and end with }.
+JSON
+{
+  \"summary\": \"2-3 sentence neutral summary of the document's overall stance.\",
+  \"category_scores\": {
+    \"data_collection\": 0,
+    \"data_sharing\": 0,
+    \"user_control\": 0,
+    \"data_longevity\": 0,
+    \"legal_integrity\": 0
+  },
+  \"justifications\": {
+    \"data_collection\": \"2-3 sentences. Quote the trigger. State if it aligns with product purpose.\",
+    \"data_sharing\": \"2-3 sentences. Quote the trigger. State if it aligns with product purpose.\",
+    \"user_control\": \"2-3 sentences. Quote the trigger. Note if process is automated or manual.\",
+    \"data_longevity\": \"2-3 sentences. Quote the trigger. Explain the retention timeframe.\",
+    \"legal_integrity\": \"2-3 sentences. Quote the trigger. Identify specific rights waived.\"
   }
+}
 
-  Output JSON ONLY. No markdown.
+Final Reminders: Use exact rubric values. Quote the text verbatim. If data is missing, state \"Information not provided in text.\"`
 
-# FINAL REMINDERS
-
-- You MUST use exact numeric values: 5, 25, 50, 75, 100 (no other numbers allowed)
-- You MUST quote verbatim from the document
-- You MUST list all detected clause types even when applying worst-case rule
-- You MUST explain purpose alignment without changing scores
-- You MUST flag vague or missing sections
-- You MUST output valid JSON only (no markdown, no commentary)
-
-  Analyze ONLY the provided document text. If information is missing, state that clearly.`
 
 /**
  * Returns an empty detection state object.
@@ -626,7 +266,10 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 /**
  * @typedef {Object} LegalAnalysisResult
  * @property {string} summary
- * @property {{overall:number, finalLevel:string, breakdown:{data_collection:number,data_sharing:number,user_control:number,data_longevity:number,legal_integrity:number}}} scores
+ * @property {{overall:number, finalLevel:string, riskLabel?:string, riskDetail?:string, breakdown:{data_collection:number,data_sharing:number,user_control:number,data_longevity:number,legal_integrity:number}}} scores
+ * @property {{data_collection:number,data_sharing:number,user_control:number,data_longevity:number,legal_integrity:number}} category_scores
+ * @property {number} final_score
+ * @property {string} overall_risk_level
  * @property {{data_collection:string,data_sharing:string,user_control:string,data_longevity:string,legal_integrity:string}} justifications
  */
 
@@ -871,18 +514,7 @@ function normalizeAnalysisPayload(payload) {
     if (!summary) {
         throw new Error("Gemini response missing summary.")
     }
-    const scoresBlock = payload.scores
-    if (!scoresBlock || typeof scoresBlock !== "object") {
-        throw new Error("Gemini response missing scores.")
-    }
-
-    const overall = clampScore(Number(scoresBlock.overall))
-    if (!Number.isFinite(overall)) {
-        throw new Error("Gemini overall score invalid.")
-    }
-    const finalLevel = typeof scoresBlock.final_level === "string" ? scoresBlock.final_level.trim() : deriveSafetyLevel(overall)
-
-    const breakdownSource = typeof scoresBlock.breakdown === "object" && scoresBlock.breakdown !== null ? scoresBlock.breakdown : {}
+    const breakdownSource = typeof payload.category_scores === "object" && payload.category_scores !== null ? payload.category_scores : {}
     const justificationSource = typeof payload.justifications === "object" && payload.justifications !== null ? payload.justifications : {}
     const categoryKeys = ["data_collection", "data_sharing", "user_control", "data_longevity", "legal_integrity"]
     const normalizedBreakdown = {}
@@ -899,14 +531,25 @@ function normalizeAnalysisPayload(payload) {
         normalizedJustifications[key] = justification || missingMessage
     }
 
+    const overall = computeWeightedScore(normalizedBreakdown)
+    const riskInfo = describeRiskLevel(overall)
+    const breakdownCopy = {...normalizedBreakdown}
+    const finalLevelLabel = `Level ${riskInfo.level} (${riskInfo.label})`
+    const overallRiskLabel = riskInfo.detail ? `${riskInfo.label} (${riskInfo.detail})` : riskInfo.label
+
     return {
         summary,
         scores: {
             overall,
-            finalLevel: finalLevel || deriveSafetyLevel(overall),
-            breakdown: normalizedBreakdown,
+            finalLevel: finalLevelLabel,
+            riskLabel: riskInfo.label,
+            riskDetail: riskInfo.detail,
+            breakdown: breakdownCopy,
         },
         justifications: normalizedJustifications,
+        category_scores: breakdownCopy,
+        final_score: overall,
+        overall_risk_level: overallRiskLabel,
     }
 }
 
@@ -914,20 +557,32 @@ function clampScore(value) {
     return Math.min(100, Math.max(0, Math.round(value)))
 }
 
-function deriveSafetyLevel(score) {
-    if (score >= 80) {
-        return "Level 5 (Predatory)"
+function computeWeightedScore(breakdown) {
+    const collection = Number(breakdown.data_collection) || 0
+    const sharing = Number(breakdown.data_sharing) || 0
+    const control = Number(breakdown.user_control) || 0
+    const longevity = Number(breakdown.data_longevity) || 0
+    const legal = Number(breakdown.legal_integrity) || 0
+    const total = (collection * 0.25) + (sharing * 0.25) + (control * 0.20) + (longevity * 0.15) + (legal * 0.15)
+    return Math.round(total)
+}
+
+const RISK_LEVELS = [
+    {min: 80, level: 5, label: "Dangerous", detail: "Very high risk"},
+    {min: 60, level: 4, label: "Risky", detail: "High risk"},
+    {min: 40, level: 3, label: "Concerning", detail: "Moderate risk"},
+    {min: 20, level: 2, label: "Acceptable", detail: "Low risk"},
+    {min: 0, level: 1, label: "Exemplary", detail: "Very low risk"},
+]
+
+function describeRiskLevel(score) {
+    const value = clampScore(score)
+    for (const band of RISK_LEVELS) {
+        if (value >= band.min) {
+            return band
+        }
     }
-    if (score >= 60) {
-        return "Level 4 (High Risk)"
-    }
-    if (score >= 40) {
-        return "Level 3 (Moderate Risk)"
-    }
-    if (score >= 20) {
-        return "Level 2 (Low Risk)"
-    }
-    return "Level 1 (Safe)"
+    return RISK_LEVELS[RISK_LEVELS.length - 1]
 }
 
 function createApiKeyIssue(message, reason) {

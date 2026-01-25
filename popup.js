@@ -74,11 +74,11 @@ const SCORE_LABELS = {
 }
 
 const SCORE_BANDS = [
-    {min: 80, level: 5, label: "Predatory"},
-    {min: 60, level: 4, label: "High Risk"},
-    {min: 40, level: 3, label: "Moderate Risk"},
-    {min: 20, level: 2, label: "Low Risk"},
-    {min: 0, level: 1, label: "Safe"},
+    {min: 80, level: 5, label: "Dangerous", detail: "Very high risk"},
+    {min: 60, level: 4, label: "Risky", detail: "High risk"},
+    {min: 40, level: 3, label: "Concerning", detail: "Moderate risk"},
+    {min: 20, level: 2, label: "Acceptable", detail: "Low risk"},
+    {min: 0, level: 1, label: "Exemplary", detail: "Very low risk"},
 ]
 const GEMINI_HELP_URL = "https://ai.google.dev/gemini-api/docs/api-key"
 
@@ -437,7 +437,7 @@ function updateAnalysisPanel(state) {
             if (hasSummaryData) {
                 analysisSummary.textContent = result.summary.trim()
             }
-            hasMeterData = updateRiskMeter(result.scores)
+            hasMeterData = updateRiskMeter(result.scores, result.overall_risk_level)
             hasBreakdownData = renderBreakdownGrid(result.scores, result.justifications)
             analysisSummaryButton && (analysisSummaryButton.disabled = !hasSummaryData)
             analysisMeterView?.classList.toggle("is-disabled", !hasBreakdownData)
@@ -503,7 +503,7 @@ function handleMeterActivate() {
     scrollAnalysisViewIntoFocus(analysisBreakdownView)
 }
 
-function updateRiskMeter(scoreData) {
+function updateRiskMeter(scoreData, explicitDescriptor) {
     if (!riskMeterScore || !riskMeterLabel || !riskMeterNeedle) {
         return false
     }
@@ -515,7 +515,11 @@ function updateRiskMeter(scoreData) {
     const providedLevel = parseLevelLabel(scoreData?.finalLevel)
     const fallbackLevel = describeScoreBand(value)
     const levelToShow = providedLevel?.level ?? fallbackLevel.level
-    const descriptor = providedLevel?.label ?? fallbackLevel.label
+    const fallbackDescriptor = formatBandDescriptor(fallbackLevel)
+    const descFromScore = scoreData?.riskLabel ? formatBandDescriptor({label: scoreData.riskLabel, detail: scoreData.riskDetail}) : null
+    const descriptor = (typeof explicitDescriptor === "string" && explicitDescriptor.trim().length)
+        ? explicitDescriptor.trim()
+        : (descFromScore || providedLevel?.label || fallbackDescriptor)
     riskMeterScore.textContent = String(Math.round(value))
     riskMeterLabel.textContent = `Level ${levelToShow} (${descriptor})`
     const rotation = -90 + (value / 100) * 180
@@ -557,7 +561,8 @@ function renderBreakdownGrid(scoreData, justifications) {
         score.textContent = String(rounded)
 
         const bandInfo = describeScoreBand(value)
-        const bandText = `Level ${bandInfo.level} (${bandInfo.label})`
+        const bandDescriptor = formatBandDescriptor(bandInfo)
+        const bandText = `Level ${bandInfo.level} (${bandDescriptor})`
         const band = document.createElement("p")
         band.className = "scoreCube__tag"
         band.textContent = bandText
@@ -598,10 +603,21 @@ function scoreLevelClass(score) {
 function describeScoreBand(score) {
     for (const band of SCORE_BANDS) {
         if (score >= band.min) {
-            return {level: band.level, label: band.label}
+            return {level: band.level, label: band.label, detail: band.detail || ""}
         }
     }
-    return {level: SCORE_BANDS[SCORE_BANDS.length - 1].level, label: SCORE_BANDS[SCORE_BANDS.length - 1].label}
+    const fallback = SCORE_BANDS[SCORE_BANDS.length - 1]
+    return {level: fallback.level, label: fallback.label, detail: fallback.detail || ""}
+}
+
+function formatBandDescriptor(band) {
+    if (!band) {
+        return ""
+    }
+    if (band.label && band.detail) {
+        return `${band.label} (${band.detail})`
+    }
+    return band.label || band.detail || ""
 }
 
 function parseLevelLabel(text) {
@@ -668,6 +684,7 @@ function openCategoryDetail(cube) {
     analysisBreakdownGrid?.classList.add("is-inactive")
     analysisBreakdownGrid?.setAttribute("aria-hidden", "true")
     analysisBreakdownView?.classList.add("is-detail")
+    analysisBackButton?.classList.add("hidden")
     categoryDetail.classList.remove("hidden")
     categoryDetail.setAttribute("aria-hidden", "false")
     const sourceRect = cube.getBoundingClientRect()
@@ -683,12 +700,14 @@ function collapseCategoryDetail(skipAnimation = false) {
         analysisBreakdownGrid?.classList.remove("is-inactive")
         analysisBreakdownGrid?.setAttribute("aria-hidden", "false")
         analysisBreakdownView?.classList.remove("is-detail")
+        analysisBackButton?.classList.remove("hidden")
         return
     }
     if (!isCategoryDetailOpen()) {
         analysisBreakdownGrid?.classList.remove("is-inactive")
         analysisBreakdownGrid?.setAttribute("aria-hidden", "false")
         analysisBreakdownView?.classList.remove("is-detail")
+        analysisBackButton?.classList.remove("hidden")
         expandedCategoryElement = null
         expandedCategoryKey = null
         categoryDetail.classList.add("hidden")
@@ -702,6 +721,7 @@ function collapseCategoryDetail(skipAnimation = false) {
         analysisBreakdownGrid?.classList.remove("is-inactive")
         analysisBreakdownGrid?.setAttribute("aria-hidden", "false")
         analysisBreakdownView?.classList.remove("is-detail")
+        analysisBackButton?.classList.remove("hidden")
         const focusTarget = origin
         expandedCategoryElement = null
         expandedCategoryKey = null
